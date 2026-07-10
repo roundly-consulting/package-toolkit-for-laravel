@@ -1,0 +1,64 @@
+{
+    "name": "roundly-consulting/package-toolkit-for-laravel",
+    "description": "A native, dependency-free toolkit for building Laravel packages: a fluent package-bootstrap builder, schema key-type macros, and database/config/model helpers.",
+    "keywords": [
+        "roundly-consulting",
+        "laravel",
+        "package",
+        "toolkit",
+        "service-provider",
+        "blueprint",
+        "macros"
+    ],
+    "homepage": "https://github.com/roundly-consulting/package-toolkit-for-laravel",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Andrej Mihaliak",
+            "email": "andrej@mihaliak.com",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": "^8.4",
+        "illuminate/contracts": "^12.0|^13.0",
+        "illuminate/database": "^12.0|^13.0",
+        "illuminate/support": "^12.0|^13.0"
+    },
+    "require-dev": {
+        "larastan/larastan": "^3.0",
+        "laravel/pint": "^1.18",
+        "mockery/mockery": "^1.6",
+        "nunomaduro/collision": "^8.5",
+        "orchestra/testbench": "^10.0|^11.0",
+        "pestphp/pest": "^4.0",
+        "pestphp/pest-plugin-arch": "^4.0",
+        "pestphp/pest-plugin-laravel": "^4.0",
+        "phpstan/phpstan-deprecation-rules": "^2.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "RoundlyConsulting\\PackageToolkit\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "RoundlyConsulting\\PackageToolkit\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "format": "vendor/bin/pint",
+        "analyse": "vendor/bin/phpstan analyse --no-progress",
+        "test": "vendor/bin/pest",
+        "test-coverage": "vendor/bin/pest --coverage --min=90"
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true,
+            "phpstan/extension-installer": true
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}
