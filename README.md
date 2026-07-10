@@ -1,6 +1,7 @@
-<!-- HERO IMAGE PLACEHOLDER — replace with the generated banner (laravel-package-hero-image). -->
 <p align="center">
-    <img src="art/hero.png" alt="package-toolkit-for-laravel" width="100%">
+    <a href="https://roundly-consulting.com/open-source">
+        <img src="art/hero.png" alt="Package Toolkit for Laravel — Roundly open source" width="100%">
+    </a>
 </p>
 
 # Package Toolkit for Laravel
