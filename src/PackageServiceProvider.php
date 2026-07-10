@@ -12,8 +12,8 @@ use ReflectionClass;
 use RoundlyConsulting\PackageToolkit\Support\ModelResolver;
 
 /**
- * Base service provider for roundly `*-for-laravel` packages: the native,
- * dependency-free replacement for acme/laravel-package-tools. Subclasses
+ * Base service provider for roundly `*-for-laravel` packages: a native,
+ * dependency-free package bootstrapper. Subclasses
  * declare what the package ships in {@see self::configurePackage()}; this base
  * emits every `runningInConsole()`-gated publish/load/commands call once.
  *

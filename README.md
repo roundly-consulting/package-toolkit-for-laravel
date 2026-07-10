@@ -6,10 +6,9 @@
 
 # Package Toolkit for Laravel
 
-A native, dependency-free toolkit for building Laravel packages. It replaces
-`acme/laravel-package-tools` with a fluent package-bootstrap builder, adds
-key-type aware schema macros, and ships small database/config/model helpers —
-using only official Laravel and Symfony APIs.
+A native, dependency-free toolkit for building Laravel packages. It gives you a
+fluent package-bootstrap builder, key-type aware schema macros, and small
+database/config/model helpers — using only official Laravel and Symfony APIs.
 
 - **Fluent bootstrap builder** — declare a package's config, migrations, views,
   translations, routes, commands, aliases, and `about` contributions; the base
