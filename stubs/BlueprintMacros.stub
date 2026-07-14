@@ -1,0 +1,19 @@
+<?php
+
+namespace Illuminate\Database\Schema;
+
+/**
+ * Static declarations for the schema macros registered by
+ * RoundlyConsulting\PackageToolkit\Concerns\RegistersBlueprintMacros.
+ *
+ * A macro only exists once a provider has booted, which a static analyser never
+ * does — so without these declarations every macro call is an "undefined method"
+ * error on a clean CI runner. Auto-loaded into consumers via the toolkit's
+ * extension.neon (phpstan/extension-installer).
+ *
+ * @method \Illuminate\Database\Schema\ColumnDefinition ownerKey(string $name, \RoundlyConsulting\PackageToolkit\Enums\KeyType $type, bool $nullable = false, bool $index = true)
+ * @method void morphKey(string $name, \RoundlyConsulting\PackageToolkit\Enums\KeyType $type, bool $nullable = false)
+ * @method void auditable()
+ * @method void polymorphicSubject(string $name, \RoundlyConsulting\PackageToolkit\Enums\KeyType $type, bool $nullable = false)
+ */
+class Blueprint {}

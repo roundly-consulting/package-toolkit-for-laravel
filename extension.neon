@@ -1,0 +1,9 @@
+parameters:
+    stubFiles:
+        - stubs/BlueprintMacros.stub
+
+services:
+    -
+        class: RoundlyConsulting\PackageToolkit\PHPStan\QueryMacrosExtension
+        tags:
+            - phpstan.broker.methodsClassReflectionExtension

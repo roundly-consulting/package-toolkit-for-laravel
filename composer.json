@@ -59,6 +59,13 @@
             "phpstan/extension-installer": true
         }
     },
+    "extra": {
+        "phpstan": {
+            "includes": [
+                "extension.neon"
+            ]
+        }
+    },
     "minimum-stability": "dev",
     "prefer-stable": true
 }
