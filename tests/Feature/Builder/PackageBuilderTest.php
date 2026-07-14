@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use RoundlyConsulting\PackageToolkit\Tests\Fixtures\Toolbox\ToolboxServiceProvider;
@@ -18,8 +17,10 @@ it('merges the package config file', function (): void {
     expect(config('toolbox.key_type'))->toBe('uuid');
 });
 
-it('loads the package migrations', function (): void {
-    expect(Schema::hasTable('toolbox_things'))->toBeTrue();
+it('never auto-loads the package migrations', function (): void {
+    expect(app('migrator')->paths())->not->toContain(
+        realpath(__DIR__.'/../../Fixtures/Toolbox/toolbox/database/migrations'),
+    );
 });
 
 it('registers a publish group for the config with the right tag', function (): void {
@@ -30,21 +31,47 @@ it('registers a publish group for the config with the right tag', function (): v
         ->and(reset($paths))->toBe(config_path('toolbox.php'));
 });
 
-it('registers a publish group for the migrations directory', function (): void {
+it('publishes every migration in the directory as a timestamped file, never the directory itself', function (): void {
     $paths = toolboxPublishes('toolbox-migrations');
 
-    expect(array_values($paths))->toContain(database_path('migrations'));
+    expect(array_values($paths))->not->toContain(database_path('migrations'))
+        ->and(array_keys($paths))->toContain(
+            realpath(__DIR__.'/../../Fixtures/Toolbox/toolbox/database/migrations/2020_01_01_000000_create_toolbox_things_table.php'),
+            realpath(__DIR__.'/../../Fixtures/Toolbox/toolbox/database/migrations/create_toolbox_gizmos_table.php'),
+        );
+
+    foreach ($paths as $destination) {
+        expect(dirname($destination))->toBe(database_path('migrations'))
+            ->and(basename($destination))->toMatch('/^\d{4}_\d{2}_\d{2}_\d{6}_create_toolbox_\w+_table\.php$/');
+    }
 });
 
-it('timestamps the single published migration stub', function (): void {
+it('publishes the migrations in the package directory order, not alphabetically', function (): void {
+    $destinations = array_values(toolboxPublishes('toolbox-migrations'));
+
+    sort($destinations);
+
+    expect(array_map(
+        static fn (string $path): string => preg_replace('/^\d{4}_\d{2}_\d{2}_\d{6}_/', '', basename($path)) ?? '',
+        $destinations,
+    ))->toBe([
+        // The source directory's order: `2020_01_01_000000_create_toolbox_things_table.php`,
+        // `create_toolbox_gizmos_table.php`, then the declared stub. Sorting the
+        // published names alphabetically would put gizmos first.
+        'create_toolbox_things_table.php',
+        'create_toolbox_gizmos_table.php',
+        'create_toolbox_widgets_table.php',
+    ]);
+});
+
+it('timestamps the published migration stub', function (): void {
     $paths = toolboxPublishes('toolbox-migrations');
 
-    $stubDest = collect($paths)->first(
-        fn (string $dest): bool => str_ends_with($dest, '_create_toolbox_widgets_table.php'),
-    );
+    $stubSource = realpath(__DIR__.'/../../Fixtures/Toolbox/toolbox/database/migrations/create_toolbox_widgets_table.php.stub');
 
-    expect($stubDest)->not->toBeNull()
-        ->and(basename($stubDest))->toMatch('/^\d{4}_\d{2}_\d{2}_\d{6}_create_toolbox_widgets_table\.php$/');
+    expect($paths)->toHaveKey($stubSource)
+        ->and(basename($paths[$stubSource]))
+        ->toMatch('/^\d{4}_\d{2}_\d{2}_\d{6}_create_toolbox_widgets_table\.php$/');
 });
 
 it('registers publish groups for translations and views', function (): void {

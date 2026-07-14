@@ -10,6 +10,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\ServiceProvider;
 use ReflectionClass;
 use RoundlyConsulting\PackageToolkit\Declarations\FacadeAliasDeclaration;
+use RoundlyConsulting\PackageToolkit\Support\MigrationPublisher;
 use RoundlyConsulting\PackageToolkit\Support\ModelResolver;
 
 /**
@@ -105,10 +106,6 @@ abstract class PackageServiceProvider extends ServiceProvider
 
     protected function bootPackage(): void
     {
-        if ($this->package->hasMigrations) {
-            $this->loadMigrationsFrom($this->package->migrationsPath());
-        }
-
         if ($this->package->hasTranslations) {
             $this->loadTranslationsFrom($this->package->translationsPath(), $this->package->name);
         }
@@ -151,21 +148,7 @@ abstract class PackageServiceProvider extends ServiceProvider
             ], $config->tag);
         }
 
-        if ($this->package->hasMigrations) {
-            $this->publishes([
-                $this->package->migrationsPath() => database_path('migrations'),
-            ], $this->package->name.'-migrations');
-        }
-
-        $timestamp = Carbon::now();
-
-        foreach ($this->package->migrationStubs as $index => $stub) {
-            $filename = $timestamp->copy()->addSeconds($index)->format('Y_m_d_His').'_'.$stub->name.'.php';
-
-            $this->publishes([
-                $this->package->migrationStubPath($stub->name) => database_path('migrations/'.$filename),
-            ], $stub->tag);
-        }
+        $this->publishPackageMigrations();
 
         if ($this->package->hasTranslations) {
             $this->publishes([
@@ -191,6 +174,47 @@ abstract class PackageServiceProvider extends ServiceProvider
 
         if ($this->package->commands !== []) {
             $this->commands($this->package->commands);
+        }
+    }
+
+    /**
+     * Register the publish groups for the package's migrations.
+     *
+     * Migrations are **publish-only** — nothing is loaded from the package, so a
+     * host's `php artisan migrate` runs exactly the files it published. Each file
+     * is published under a `<Y_m_d_His>_<name>.php` filename so it orders against
+     * the host's own migrations; the timestamps step forward one second per file,
+     * preserving the package directory's order (a package's migrations often
+     * depend on each other's tables). Republishing lands on the file it landed on
+     * last time, so a second publish overwrites in place instead of creating a
+     * duplicate migration.
+     */
+    protected function publishPackageMigrations(): void
+    {
+        $timestamp = Carbon::now();
+        $directory = database_path('migrations');
+        $offset = 0;
+
+        $sources = $this->package->hasMigrations ? $this->package->migrationFiles() : [];
+
+        foreach ($sources as $file) {
+            $this->publishes([
+                $file => MigrationPublisher::destination(
+                    MigrationPublisher::nameFor($file),
+                    $directory,
+                    $timestamp->copy()->addSeconds($offset++),
+                ),
+            ], $this->package->name.'-migrations');
+        }
+
+        foreach ($this->package->migrationStubs as $stub) {
+            $this->publishes([
+                $this->package->migrationStubPath($stub->name) => MigrationPublisher::destination(
+                    MigrationPublisher::nameFor($stub->name),
+                    $directory,
+                    $timestamp->copy()->addSeconds($offset++),
+                ),
+            ], $stub->tag);
         }
     }
 

@@ -87,8 +87,12 @@ final class Package
     }
 
     /**
-     * Load the package's `database/migrations` directory and publish it under
-     * the `<name>-migrations` tag.
+     * Publish every `database/migrations/*.php` file under the
+     * `<name>-migrations` tag, each timestamp-injected on publish and kept in
+     * the directory's own sort order.
+     *
+     * Migrations are **publish-only**: nothing is auto-loaded, so the host runs
+     * `vendor:publish --tag=<name>-migrations` and then `php artisan migrate`.
      */
     public function hasMigrations(): self
     {
@@ -98,8 +102,10 @@ final class Package
     }
 
     /**
-     * Publish a single `database/migrations/<name>.php.stub`, timestamp-injected
-     * on publish, under the `<name>-migrations` tag.
+     * Publish a single `database/migrations/<name>.php.stub` under the
+     * `<name>-migrations` tag, timestamp-injected on publish. The `.php` form of
+     * the same thing is covered by {@see self::hasMigrations()}, which globs the
+     * directory; use this only for a `.php.stub` source.
      */
     public function hasMigration(string $name): self
     {
@@ -221,6 +227,22 @@ final class Package
     public function migrationsPath(): string
     {
         return $this->basePath.'/database/migrations';
+    }
+
+    /**
+     * The package's `.php` migration sources, in the directory's sort order —
+     * the order the migrator would have run them in. `.php.stub` sources are
+     * excluded; they are declared one by one with {@see self::hasMigration()}.
+     *
+     * @return list<string>
+     */
+    public function migrationFiles(): array
+    {
+        $files = glob($this->migrationsPath().'/*.php') ?: [];
+
+        sort($files);
+
+        return $files;
     }
 
     public function migrationStubPath(string $name): string

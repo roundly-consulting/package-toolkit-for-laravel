@@ -69,8 +69,8 @@ for a non-standard layout.
 | --- | --- |
 | `name(string $name)` | The package handle. Drives config keys, view/translation namespaces, and publish tags. |
 | `hasConfigFile(?string $file = null)` | Merge + publish a config file. Defaults to `<name>.php` (key `<name>`, tag `<name>-config`). |
-| `hasMigrations()` | Load `database/migrations` and publish it under `<name>-migrations`. |
-| `hasMigration(string $name)` | Publish a single `database/migrations/<name>.php.stub`, timestamp-injected on publish, under `<name>-migrations`. |
+| `hasMigrations()` | Publish every `database/migrations/*.php` file under `<name>-migrations`, each timestamp-injected and kept in the directory's order. Nothing is auto-loaded — see below. |
+| `hasMigration(string $name)` | Publish a single `database/migrations/<name>.php.stub` under `<name>-migrations`, timestamp-injected. Use only for a `.php.stub` source; `.php` files are picked up by `hasMigrations()`. |
 | `hasTranslations()` | Load + publish translations (published to `lang/vendor/<name>`, tag `<name>-translations`). |
 | `hasViews(?string $namespace = null)` | Register + publish Blade views (namespace defaults to `<name>`, tag `<name>-views`). |
 | `hasRoutes(string $file, ?string $enabledVia = null)` | Load a route file (optionally gated behind a boolean config key) and publish it under `<name>-routes`. |
@@ -78,6 +78,31 @@ for a non-standard layout.
 | `hasFacadeAlias(string $class, ?string $configKey = null)` | Register a class alias. The config value decides: `false`/`null`/`''` skip it, a non-empty string renames it, `true` or an absent key (or any unrecognized value) use the class's base name. |
 | `contributesToAbout(?Closure $data = null)` | Add a section to `php artisan about`. |
 | `publishesStubs(string $from, string $to, string $tag)` | Publish an arbitrary set of files under a custom tag. |
+
+### Migrations are publish-only
+
+A package built on the toolkit **never auto-loads its migrations**. The host
+publishes them and runs the migrator:
+
+```bash
+php artisan vendor:publish --tag=comments-migrations
+php artisan migrate
+```
+
+Each file is published to `database/migrations/<Y_m_d_His>_<name>.php`, so it
+orders against the host's own migrations. When a package ships several
+migrations, their timestamps step forward one second per file **in the package
+directory's order**, so migrations that depend on each other's tables still run
+in the right sequence. Any timestamp the package itself prefixed its source file
+with is replaced by the publish timestamp.
+
+Republishing is safe: the destination resolver reuses the file the migration was
+already published to, so `vendor:publish --tag=comments-migrations --force`
+overwrites in place instead of dropping a second, differently timestamped copy of
+the same `Schema::create()`.
+
+A package's own test suite must therefore run its migrations explicitly (e.g.
+`$this->loadMigrationsFrom(__DIR__.'/../database/migrations')` in `TestCase`).
 
 ### Register-time helpers
 

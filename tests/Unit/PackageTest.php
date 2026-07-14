@@ -47,6 +47,20 @@ it('builds path helpers relative to the base path', function (): void {
         ->and($package->routesPath('web.php'))->toBe('/pkg/routes/web.php');
 });
 
+it('lists the php migration sources in directory order and excludes stub sources', function (): void {
+    $package = (new Package)->name('toolbox')
+        ->setBasePath(__DIR__.'/../Fixtures/Toolbox/toolbox');
+
+    expect(array_map('basename', $package->migrationFiles()))->toBe([
+        '2020_01_01_000000_create_toolbox_things_table.php',
+        'create_toolbox_gizmos_table.php',
+    ]);
+});
+
+it('has no migration sources when the package ships no migrations directory', function (): void {
+    expect((new Package)->name('widgets')->setBasePath('/pkg')->migrationFiles())->toBe([]);
+});
+
 it('uses the package name as the about section with a default resolver', function (): void {
     $package = (new Package)->name('widgets')->contributesToAbout();
 
