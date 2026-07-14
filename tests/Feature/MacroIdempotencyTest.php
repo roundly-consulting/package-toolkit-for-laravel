@@ -34,6 +34,11 @@ function macroHarness(): object
         {
             $this->defineGate($ability, $callback);
         }
+
+        public function bladeIf(string $name, callable $condition): void
+        {
+            $this->registerBladeIf($name, $condition);
+        }
     };
 }
 
@@ -55,6 +60,33 @@ it('does not clobber an already-registered blade directive', function (): void {
     $directive = Blade::getCustomDirectives()['toolboxTag'];
 
     expect($directive(''))->toBe("<?php echo 'first'; ?>");
+});
+
+it('does not clobber an already-registered blade conditional on a double boot', function (): void {
+    $harness = macroHarness();
+
+    $harness->bladeIf('toolboxFlag', static fn (): bool => true);
+    $harness->bladeIf('toolboxFlag', static fn (): bool => false);
+
+    expect(trim(Blade::render('@toolboxFlag yes @else no @endtoolboxFlag')))->toBe('yes');
+});
+
+it('leaves a plain directive alone when a conditional claims the same name', function (): void {
+    $harness = macroHarness();
+
+    $harness->directive('toolboxClaimed', static fn (): string => "<?php echo 'directive'; ?>");
+    $harness->bladeIf('toolboxClaimed', static fn (): bool => true);
+
+    expect(trim(Blade::render('@toolboxClaimed')))->toBe('directive');
+});
+
+it('does not let a plain directive clobber a registered conditional', function (): void {
+    $harness = macroHarness();
+
+    $harness->bladeIf('toolboxGuarded', static fn (): bool => true);
+    $harness->directive('toolboxGuarded', static fn (): string => "<?php echo 'directive'; ?>");
+
+    expect(trim(Blade::render('@toolboxGuarded yes @else no @endtoolboxGuarded')))->toBe('yes');
 });
 
 it('does not clobber an already-defined gate', function (): void {

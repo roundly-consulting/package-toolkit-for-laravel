@@ -56,6 +56,7 @@ final class ToolboxServiceProvider extends PackageServiceProvider
         $this->observesModel('toolbox.observed_model', ArticleObserver::class);
         $this->registerBlueprintMacros();
         $this->registerBladeDirective('toolboxHello', static fn (): string => "<?php echo 'hi from toolbox'; ?>");
+        $this->registerBladeIf('toolboxEnabled', static fn (bool $flag): bool => $flag);
         $this->defineGate('toolbox-manage', static fn (mixed $user): bool => true);
     }
 
