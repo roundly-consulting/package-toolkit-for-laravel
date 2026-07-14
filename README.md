@@ -75,7 +75,7 @@ for a non-standard layout.
 | `hasViews(?string $namespace = null)` | Register + publish Blade views (namespace defaults to `<name>`, tag `<name>-views`). |
 | `hasRoutes(string $file, ?string $enabledVia = null)` | Load a route file (optionally gated behind a boolean config key) and publish it under `<name>-routes`. |
 | `hasCommands(array $commands)` | Register console commands (console only). |
-| `hasFacadeAlias(string $class, ?string $configKey = null)` | Register a class alias (base-name), optionally gated behind a boolean config key. |
+| `hasFacadeAlias(string $class, ?string $configKey = null)` | Register a class alias. The config value decides: `false`/`null`/`''` skip it, a non-empty string renames it, `true` or an absent key (or any unrecognized value) use the class's base name. |
 | `contributesToAbout(?Closure $data = null)` | Add a section to `php artisan about`. |
 | `publishesStubs(string $from, string $to, string $tag)` | Publish an arbitrary set of files under a custom tag. |
 
@@ -124,6 +124,7 @@ final class CommentsServiceProvider extends PackageServiceProvider
 
         $this->registerBlueprintMacros();                      // ownerKey/morphKey/auditable/polymorphicSubject/whereLikeEscaped
         $this->registerBladeDirective('comment', $handler);    // no-op if already registered
+        $this->registerBladeIf('commented', $condition);       // @commented(...) … @else … @endcommented
         $this->defineGate('manage-comments', $callback);       // left untouched if the host defined it
     }
 }

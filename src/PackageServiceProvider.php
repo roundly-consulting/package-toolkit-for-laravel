@@ -9,6 +9,7 @@ use Illuminate\Foundation\Console\AboutCommand;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\ServiceProvider;
 use ReflectionClass;
+use RoundlyConsulting\PackageToolkit\Declarations\FacadeAliasDeclaration;
 use RoundlyConsulting\PackageToolkit\Support\ModelResolver;
 
 /**
@@ -65,12 +66,41 @@ abstract class PackageServiceProvider extends ServiceProvider
     protected function registerFacadeAliases(): void
     {
         foreach ($this->package->facadeAliases as $alias) {
-            if ($alias->configKey !== null && config($alias->configKey, true) === false) {
+            $name = $this->resolveAliasName($alias);
+
+            if ($name === null) {
                 continue;
             }
 
-            AliasLoader::getInstance()->alias($alias->alias, $alias->class);
+            AliasLoader::getInstance()->alias($name, $alias->class);
         }
+    }
+
+    /**
+     * The alias name to register for a declaration, or `null` to skip it. The
+     * config value (when the declaration names one) decides: `false`, `null` or
+     * an empty string skip aliasing; a non-empty string renames the alias;
+     * `true`, an absent key, or any unrecognized value falls back to the
+     * declared default (the facade's base name).
+     */
+    protected function resolveAliasName(FacadeAliasDeclaration $alias): ?string
+    {
+        if ($alias->configKey === null) {
+            return $alias->alias;
+        }
+
+        // An absent key defaults to `true`, so an explicit `null` still opts out.
+        $configured = config($alias->configKey, true);
+
+        if ($configured === false || $configured === null) {
+            return null;
+        }
+
+        if (is_string($configured)) {
+            return $configured === '' ? null : $configured;
+        }
+
+        return $alias->alias;
     }
 
     protected function bootPackage(): void

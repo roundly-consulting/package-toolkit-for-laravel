@@ -162,8 +162,10 @@ final class Package
     }
 
     /**
-     * Register a class alias, optionally gated behind a boolean config key. The
-     * alias name is the class's base name.
+     * Register a class alias, optionally driven by a config key. The config
+     * value decides: `false`, `null` or `''` skip the alias entirely; a
+     * non-empty string is used as the alias name; `true` (or an absent key)
+     * falls back to the class's base name — as does any unrecognized value.
      *
      * @param  class-string  $class
      */
