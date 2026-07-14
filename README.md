@@ -158,6 +158,29 @@ Schema::create('comments', function (Blueprint $table) use ($type): void {
 | `auditable()` | `timestamps()` + `softDeletes()`. |
 | `polymorphicSubject(string $name, KeyType $type, bool $nullable = false)` | A polymorphic subject column pair. |
 
+### Static analysis of the macros
+
+A macro only exists once a service provider has booted — which PHPStan never
+does — so `$table->morphKey(...)` would otherwise be an "undefined method"
+error under Larastan. The toolkit ships a PHPStan extension that declares the
+macros statically:
+
+- `stubs/BlueprintMacros.stub` — the four `Blueprint` macros.
+- `RoundlyConsulting\PackageToolkit\PHPStan\QueryMacrosExtension` — the
+  `whereLikeEscaped()` macro on the query and Eloquent builders (both builder
+  classes are already described by Larastan's own stub files, and only one stub
+  per class is used, so these are contributed by reflection instead).
+
+Both are registered in `extension.neon`, which
+[`phpstan/extension-installer`](https://github.com/phpstan/extension-installer)
+picks up automatically — nothing to configure. Without the installer, include it
+by hand:
+
+```neon
+includes:
+    - vendor/roundly-consulting/package-toolkit-for-laravel/extension.neon
+```
+
 ## Database & config helpers
 
 ```php
