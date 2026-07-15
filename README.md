@@ -18,8 +18,9 @@ database/config/model helpers — using only official Laravel and Symfony APIs.
   (`bigint`/`uuid`/`ulid`) with `ownerKey()`, `morphKey()`, `auditable()`, and
   `polymorphicSubject()` schema macros.
 - **Database helpers** — a `DatabaseDriver` enum, a portable, injection-safe
-  `whereLikeEscaped()` search, config validate-or-throw accessors, a model
-  resolver, and a locked read-modify-write helper.
+  `whereLikeEscaped()` search, config validate-or-throw accessors (including a
+  strict enum accessor and an array-validating entry point), and a model
+  resolver.
 
 ## Requirements
 
@@ -211,11 +212,13 @@ includes:
 ```php
 use RoundlyConsulting\PackageToolkit\Enums\DatabaseDriver;
 use RoundlyConsulting\PackageToolkit\Support\Config;
-use RoundlyConsulting\PackageToolkit\Support\LockedUpdate;
 use RoundlyConsulting\PackageToolkit\Support\ModelResolver;
 
-// Driver-aware branching.
-DatabaseDriver::current()->isPgsql();
+// Driver-aware branching. current() is for boot / console / migration paths
+// that may fail loudly; on a request path use tryFrom() + a portable fallback,
+// because the enum is closed while Laravel's driver set (e.g. sqlsrv) is not:
+DatabaseDriver::current()->isPgsql();                                  // boot/console
+DatabaseDriver::tryFrom($driver)?->isPgsql() ?? false;                 // request path
 
 // Portable, injection-safe "contains" search (LIKE / ILIKE with ESCAPE '\').
 Comment::query()->whereLikeEscaped('body', $term);
@@ -223,16 +226,44 @@ Comment::query()->whereLikeEscaped('body', $term);
 // Validate-or-throw config accessors (throw InvalidConfigurationException).
 Config::intBetween('comments.per_page', 1, 100, 20);
 Config::requireString('comments.table');
-Config::enumOr('comments.key_type', KeyType::class, KeyType::BigInt);
+Config::enumOr('comments.key_type', KeyType::class, KeyType::BigInt);  // lenient: falls back
+Config::enum('comments.hash_algo', HashAlgorithm::class);              // strict: throws on a typo
 Config::boolean('comments.enabled', true);
 
 // Resolve + validate a model class from config.
 $class = ModelResolver::for('comments.models.comment');       // class-string<Model>
 $model = ModelResolver::newModel('comments.models.comment');
-
-// Atomic, locked read-modify-write.
-$fresh = LockedUpdate::run($wallet, fn ($w) => $w->balance += 100);
 ```
+
+### Validating a DTO's input, with your own exception
+
+The static accessors above read the **global config repository** by key. When a
+DTO validates an array it was handed (a `fromArray()`), reading the repository
+would let a value the caller never passed slip through — so start a validator
+bound to that array with `Config::for()`. Nominate your package's own exception
+class as the second argument and misconfiguration surfaces through *your*
+hierarchy, not the toolkit's:
+
+```php
+use RoundlyConsulting\PackageToolkit\Support\Config;
+
+final readonly class PasskeyConfig
+{
+    public static function fromArray(array $config): self
+    {
+        $v = Config::for($config, PasskeyException::class);
+
+        return new self(
+            timeout: $v->intBetween('timeout', 1, 300, 60),   // validates the 99999 you were handed
+            trust: $v->enum('attestation', TrustMode::class), // a typo throws PasskeyException, never a silent downgrade
+            rpId: $v->requireString('rp_id'),
+        );
+    }
+}
+```
+
+`Config::using(MyException::class)` gives the same nominated-exception validator
+while still reading the global repository, for config a package owns outright.
 
 There is also a `ResolvesModels` trait (convenience over `ModelResolver`) and a
 `HasRetryAfter` contract with a `ProvidesRetryAfter` trait for exceptions that
