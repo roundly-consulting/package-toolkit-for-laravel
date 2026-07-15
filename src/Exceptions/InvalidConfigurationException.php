@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\PackageToolkit\Exceptions;
 
+use BackedEnum;
+
 /**
  * Thrown when a package reads a configuration value that is missing, of the
  * wrong type, out of range, or otherwise unusable.
@@ -28,6 +30,19 @@ final class InvalidConfigurationException extends PackageToolkitException
     public static function outOfRange(string $key, int $min, int $max): self
     {
         return new self("Configuration value [{$key}] must be between {$min} and {$max}.");
+    }
+
+    /**
+     * @param  class-string<BackedEnum>  $enum
+     */
+    public static function notAValidEnum(string $key, string $enum): self
+    {
+        $allowed = implode(', ', array_map(
+            static fn (BackedEnum $case): string => (string) $case->value,
+            $enum::cases(),
+        ));
+
+        return new self("Configuration value [{$key}] must be one of [{$allowed}].");
     }
 
     public static function notAModel(string $key, mixed $value): self

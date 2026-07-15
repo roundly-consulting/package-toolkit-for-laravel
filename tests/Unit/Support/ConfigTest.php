@@ -5,6 +5,7 @@ declare(strict_types=1);
 use RoundlyConsulting\PackageToolkit\Enums\KeyType;
 use RoundlyConsulting\PackageToolkit\Exceptions\InvalidConfigurationException;
 use RoundlyConsulting\PackageToolkit\Support\Config;
+use RoundlyConsulting\PackageToolkit\Tests\Fixtures\CustomConfigException;
 
 describe('intBetween', function (): void {
     it('returns an in-range value', function (): void {
@@ -96,4 +97,82 @@ describe('boolean', function (): void {
         config()->set('toolbox.b', 'not-a-bool');
         expect(Config::boolean('toolbox.b', true))->toBeTrue();
     });
+});
+
+describe('enum (strict)', function (): void {
+    it('maps a recognized value', function (): void {
+        config()->set('toolbox.kt', 'uuid');
+
+        expect(Config::enum('toolbox.kt', KeyType::class))->toBe(KeyType::Uuid);
+    });
+
+    it('passes through an enum instance', function (): void {
+        config()->set('toolbox.kt', KeyType::Ulid);
+
+        expect(Config::enum('toolbox.kt', KeyType::class))->toBe(KeyType::Ulid);
+    });
+
+    it('THROWS on a typo where enumOr would silently fall back', function (): void {
+        config()->set('toolbox.kt', 'uudi');
+
+        // enumOr is lenient — it downgrades to the default without a peep.
+        expect(Config::enumOr('toolbox.kt', KeyType::class, KeyType::BigInt))->toBe(KeyType::BigInt);
+
+        // enum is strict — the same typo fails loudly, listing the valid cases.
+        Config::enum('toolbox.kt', KeyType::class);
+    })->throws(InvalidConfigurationException::class, 'must be one of [bigint, uuid, ulid]');
+
+    it('throws when the value is missing', function (): void {
+        config()->set('toolbox.kt', null);
+
+        Config::enum('toolbox.kt', KeyType::class);
+    })->throws(InvalidConfigurationException::class, 'required but missing');
+});
+
+describe('array validation via for()', function (): void {
+    it('validates the array it was handed, not the global repository', function (): void {
+        // The classic bypass: repository holds a safe value, the handed array
+        // holds an out-of-range one. Reading the repository would ACCEPT 60;
+        // validating the array must REJECT 99999.
+        config()->set('passkeys.timeout', 60);
+
+        Config::for(['timeout' => 99999])->intBetween('timeout', 1, 300, 60);
+    })->throws(InvalidConfigurationException::class, 'between 1 and 300');
+
+    it('reads values out of the handed array, including dot notation', function (): void {
+        $config = ['timeout' => '120', 'attestation' => 'uuid', 'nested' => ['flag' => 'true']];
+
+        $validator = Config::for($config);
+
+        expect($validator->intBetween('timeout', 1, 300, 60))->toBe(120)
+            ->and($validator->enum('attestation', KeyType::class))->toBe(KeyType::Uuid)
+            ->and($validator->boolean('nested.flag'))->toBeTrue();
+    });
+
+    it('rejects a strict enum typo in a handed array', function (): void {
+        Config::for(['attestation' => 'bassic'])->enum('attestation', KeyType::class);
+    })->throws(InvalidConfigurationException::class, 'must be one of');
+
+    it('falls back to the default for a missing optional key', function (): void {
+        expect(Config::for([])->intBetween('timeout', 1, 300, 60))->toBe(60)
+            ->and(Config::for([])->enumOr('attestation', KeyType::class, KeyType::BigInt))->toBe(KeyType::BigInt)
+            ->and(Config::for([])->boolean('flag', true))->toBeTrue();
+    });
+});
+
+describe('nominated exception class', function (): void {
+    it('throws the package exception from an array validator', function (): void {
+        Config::for(['timeout' => 99999], CustomConfigException::class)
+            ->intBetween('timeout', 1, 300, 60);
+    })->throws(CustomConfigException::class, 'between 1 and 300');
+
+    it('throws the package exception from a repository validator', function (): void {
+        config()->set('passkeys.attestation', 'nope');
+
+        Config::using(CustomConfigException::class)->enum('passkeys.attestation', KeyType::class);
+    })->throws(CustomConfigException::class, 'must be one of');
+
+    it('preserves the toolkit exception message when none is nominated', function (): void {
+        Config::for(['timeout' => 99999])->intBetween('timeout', 1, 300, 60);
+    })->throws(InvalidConfigurationException::class, 'between 1 and 300');
 });

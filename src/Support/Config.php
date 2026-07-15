@@ -6,11 +6,18 @@ namespace RoundlyConsulting\PackageToolkit\Support;
 
 use BackedEnum;
 use RoundlyConsulting\PackageToolkit\Exceptions\InvalidConfigurationException;
+use Throwable;
 
 /**
  * Validate-or-throw accessors for package configuration. These provide the
  * repeated *mechanism* (read a key, check its shape, fail loudly on
  * misconfiguration) — the domain bounds stay with each package's call site.
+ *
+ * The static helpers read the **global config repository** by key and throw the
+ * toolkit's own {@see InvalidConfigurationException}. When you instead need to
+ * validate an array you were handed (a `fromArray()` DTO), or to throw your
+ * package's own exception, start a {@see ConfigValidator} via {@see self::for()}
+ * or {@see self::using()}.
  */
 final class Config
 {
@@ -21,25 +28,7 @@ final class Config
      */
     public static function intBetween(string $key, int $min, int $max, int $default): int
     {
-        $value = config($key);
-
-        if ($value === null) {
-            $value = $default;
-        }
-
-        if (is_string($value) && $value !== '' && ctype_digit(ltrim($value, '-'))) {
-            $value = (int) $value;
-        }
-
-        if (! is_int($value)) {
-            throw InvalidConfigurationException::notAnInteger($key);
-        }
-
-        if ($value < $min || $value > $max) {
-            throw InvalidConfigurationException::outOfRange($key, $min, $max);
-        }
-
-        return $value;
+        return ConfigValidator::forRepository()->intBetween($key, $min, $max, $default);
     }
 
     /**
@@ -48,22 +37,29 @@ final class Config
      */
     public static function requireString(string $key): string
     {
-        $value = config($key);
+        return ConfigValidator::forRepository()->requireString($key);
+    }
 
-        if ($value === null) {
-            throw InvalidConfigurationException::missing($key);
-        }
-
-        if (! is_string($value) || trim($value) === '') {
-            throw InvalidConfigurationException::notAString($key);
-        }
-
-        return $value;
+    /**
+     * A strict backed-enum config value: throws when the configured value is
+     * missing or not a recognized case. Use this — not {@see self::enumOr()} —
+     * for security-sensitive parameters, so an env typo fails loudly instead of
+     * silently downgrading to a default.
+     *
+     * @template TEnum of BackedEnum
+     *
+     * @param  class-string<TEnum>  $enum
+     * @return TEnum
+     */
+    public static function enum(string $key, string $enum): BackedEnum
+    {
+        return ConfigValidator::forRepository()->enum($key, $enum);
     }
 
     /**
      * A backed-enum config value, falling back to `$default` for a missing or
-     * unrecognized value (this accessor is lenient by design — hence "Or").
+     * unrecognized value (this accessor is lenient by design — hence "Or"). For
+     * a security parameter use {@see self::enum()} instead.
      *
      * @template TEnum of BackedEnum
      *
@@ -73,17 +69,7 @@ final class Config
      */
     public static function enumOr(string $key, string $enum, BackedEnum $default): BackedEnum
     {
-        $value = config($key);
-
-        if ($value instanceof $enum) {
-            return $value;
-        }
-
-        if (is_string($value) || is_int($value)) {
-            return $enum::tryFrom($value) ?? $default;
-        }
-
-        return $default;
+        return ConfigValidator::forRepository()->enumOr($key, $enum, $default);
     }
 
     /**
@@ -92,12 +78,31 @@ final class Config
      */
     public static function boolean(string $key, bool $default = false): bool
     {
-        $value = config($key);
+        return ConfigValidator::forRepository()->boolean($key, $default);
+    }
 
-        if ($value === null) {
-            return $default;
-        }
+    /**
+     * Validate the values inside an array you were handed (e.g. the payload a
+     * DTO's `fromArray()` received), rather than reading the global repository
+     * behind the caller's back. Optionally nominate the exception class thrown
+     * on failure so your package's own hierarchy is preserved.
+     *
+     * @param  array<string, mixed>  $config
+     * @param  class-string<Throwable>  $exception
+     */
+    public static function for(array $config, string $exception = InvalidConfigurationException::class): ConfigValidator
+    {
+        return ConfigValidator::forArray($config, $exception);
+    }
 
-        return filter_var($value, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE) ?? $default;
+    /**
+     * Validate values read from the global config repository, but throw your
+     * package's own exception class instead of the toolkit's.
+     *
+     * @param  class-string<Throwable>  $exception
+     */
+    public static function using(string $exception): ConfigValidator
+    {
+        return ConfigValidator::forRepository($exception);
     }
 }
