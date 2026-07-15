@@ -26,7 +26,21 @@ enum DatabaseDriver: string
 
     /**
      * The driver of the given connection (or the default connection when none
-     * is supplied). Throws for a driver the toolkit does not model.
+     * is supplied). **Throws for a driver the toolkit does not model** — and the
+     * modelled set is deliberately closed while Laravel's is not (`sqlsrv` is a
+     * first-party driver this enum does not carry).
+     *
+     * Use `current()` only on **boot / console / migration** paths that may fail
+     * loudly. On a **request path**, never call it — an unmodelled driver would
+     * turn a working endpoint into an uncaught 500. Instead branch with a
+     * portable fallback:
+     *
+     * ```php
+     * $isPgsql = DatabaseDriver::tryFrom($connection->getDriverName())?->isPgsql() ?? false;
+     * ```
+     *
+     * `tryFrom()` returns null for any driver outside the four cases, so an
+     * unmodelled engine degrades to the portable branch instead of throwing.
      */
     public static function current(?ConnectionInterface $connection = null): self
     {

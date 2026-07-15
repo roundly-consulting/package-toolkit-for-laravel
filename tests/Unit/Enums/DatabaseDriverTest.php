@@ -36,6 +36,13 @@ it('throws for a driver it does not model', function (): void {
     DatabaseDriver::current($connection);
 })->throws(InvalidConfigurationException::class, 'Unsupported database driver [sqlsrv]');
 
+it('tryFrom returns null for an unmodelled driver so request paths can degrade', function (): void {
+    // The rule: request paths use tryFrom() + a portable fallback, never
+    // current(), because the enum is closed while Laravel's driver set is not.
+    expect(DatabaseDriver::tryFrom('sqlsrv'))->toBeNull()
+        ->and(DatabaseDriver::tryFrom('sqlsrv')?->isPgsql() ?? false)->toBeFalse();
+});
+
 it('throws for a connection that cannot report its driver', function (): void {
     $connection = Mockery::mock(ConnectionInterface::class);
 
