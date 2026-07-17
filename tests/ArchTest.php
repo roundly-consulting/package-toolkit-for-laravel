@@ -30,8 +30,10 @@ ArchPresets::strictTypes('RoundlyConsulting\PackageToolkit');
  * PackageToolkitException, the abstract base every toolkit error extends so a host can
  * catch them uniformly. Everything else stays closed.
  */
-ArchPresets::finalByDefault('RoundlyConsulting\PackageToolkit')
-    ->ignoring([PackageServiceProvider::class, PackageToolkitException::class]);
+ArchPresets::finalByDefault('RoundlyConsulting\PackageToolkit', [
+    PackageServiceProvider::class,
+    PackageToolkitException::class,
+]);
 
 /**
  * The toolkit does no cryptography. The ban matters more here than anywhere: `KeyType`
