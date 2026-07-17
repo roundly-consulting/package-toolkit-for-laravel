@@ -6,29 +6,45 @@ namespace RoundlyConsulting\PackageToolkit\Tests;
 
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
-use Orchestra\Testbench\TestCase as Orchestra;
+use Illuminate\Support\ServiceProvider;
 use RoundlyConsulting\PackageToolkit\Tests\Fixtures\Toolbox\ToolboxServiceProvider;
+use RoundlyConsulting\Testing\PackageTestCase;
 
-abstract class TestCase extends Orchestra
+abstract class TestCase extends PackageTestCase
 {
     /**
-     * @return array<int, class-string>
+     * The toolkit ships no service provider of its own — it ships the *base* every other
+     * package's provider extends. Toolbox is the fixture consumer that exercises the
+     * builder end to end, so it stands in for the 45 real providers here.
+     *
+     * @return list<class-string<ServiceProvider>>
      */
-    protected function getPackageProviders($app): array
+    protected function packageProviders(): array
     {
-        return [
-            ToolboxServiceProvider::class,
-        ];
+        return [ToolboxServiceProvider::class];
     }
 
-    protected function defineEnvironment($app): void
+    /**
+     * A literal directory, not a provider class: the base case resolves a provider to its
+     * `database/migrations` by reflecting on the provider's own file location, and the
+     * Toolbox fixture deliberately overrides `resolvePackageBasePath()` to point at its
+     * nested `toolbox/` tree. Naming the provider here would resolve to the wrong path.
+     *
+     * @return list<class-string<ServiceProvider>|string>
+     */
+    protected function migrationSources(): array
     {
-        $app['config']->set('database.default', 'testing');
+        return [__DIR__.'/Fixtures/Toolbox/toolbox/database/migrations'];
     }
 
+    /**
+     * Two host-owned fixture tables the toolkit's macros and model helpers act on. They
+     * are ad-hoc `Schema::create()` calls rather than migrations on purpose — nothing here
+     * is a shipped migration, so there is no order to pin.
+     */
     protected function defineDatabaseMigrations(): void
     {
-        $this->loadMigrationsFrom(__DIR__.'/Fixtures/Toolbox/toolbox/database/migrations');
+        parent::defineDatabaseMigrations();
 
         Schema::create('counters', function (Blueprint $table): void {
             $table->id();
