@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\PackageToolkit\Tests\Fixtures\Toolbox;
 
+use Illuminate\Support\Str;
 use RoundlyConsulting\PackageToolkit\Concerns\InteractsWithGates;
 use RoundlyConsulting\PackageToolkit\Concerns\RegistersBladeDirectives;
 use RoundlyConsulting\PackageToolkit\Concerns\RegistersBlueprintMacros;
@@ -34,7 +35,15 @@ final class ToolboxServiceProvider extends PackageServiceProvider
             ->hasFacadeAlias(Toolbox::class, 'toolbox.alias')
             ->hasFacadeAlias(Widget::class, 'toolbox.disabled_alias')
             ->hasFacadeAlias(Gadget::class)
-            ->contributesToAbout()
+            ->contributesToAbout(static fn (): array => [
+                'Package' => 'toolbox',
+                'Key type' => (string) config('toolbox.key_type'),
+                'Greeter' => class_basename((string) config('toolbox.greeter')),
+                // The correct pattern, and the one purchases #13 got wrong: a credential
+                // is reported redacted. The raw value stays in config and must never
+                // reach the rendered section.
+                'Credential' => Str::mask((string) config('toolbox.credential'), '*', 7),
+            ])
             ->publishesStubs(
                 $package->basePath.'/stubs',
                 base_path('stubs/toolbox'),
