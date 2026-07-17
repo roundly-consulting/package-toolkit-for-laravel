@@ -6,9 +6,16 @@ use Illuminate\Database\Connection;
 use Illuminate\Database\ConnectionInterface;
 use RoundlyConsulting\PackageToolkit\Enums\DatabaseDriver;
 use RoundlyConsulting\PackageToolkit\Exceptions\InvalidConfigurationException;
+use RoundlyConsulting\Testing\Database\DriverMatrix;
 
+/**
+ * The one case here that reads a *real* connection rather than a mock, so it is the one
+ * that must follow the leg it runs on. Hard-coding Sqlite asserted the test environment,
+ * not the enum: this is the package that owns driver detection for the whole fleet, and
+ * pinning its own detector to one driver is the blind spot in miniature.
+ */
 it('resolves the default connection driver', function (): void {
-    expect(DatabaseDriver::current())->toBe(DatabaseDriver::Sqlite);
+    expect(DatabaseDriver::current())->toBe(DatabaseDriver::from(DriverMatrix::driver()));
 });
 
 it('resolves the driver of a given connection', function (): void {

@@ -25,7 +25,7 @@ it('emits a bigint owner key with index', function (): void {
         $table->ownerKey('owner', KeyType::BigInt);
     });
 
-    expect(Schema::getColumnType('ok_bigint', 'owner'))->toBe('integer');
+    expect(Schema::getColumnType('ok_bigint', 'owner'))->toBe(expectedKeyColumnType(KeyType::BigInt));
 });
 
 it('emits a uuid owner key', function (): void {
@@ -34,7 +34,7 @@ it('emits a uuid owner key', function (): void {
         $table->ownerKey('owner', KeyType::Uuid);
     });
 
-    expect(Schema::getColumnType('ok_uuid', 'owner'))->toBe('varchar');
+    expect(Schema::getColumnType('ok_uuid', 'owner'))->toBe(expectedKeyColumnType(KeyType::Uuid));
 });
 
 it('emits a nullable ulid owner key without an index', function (): void {
@@ -43,7 +43,7 @@ it('emits a nullable ulid owner key without an index', function (): void {
         $table->ownerKey('owner', KeyType::Ulid, nullable: true, index: false);
     });
 
-    expect(Schema::getColumnType('ok_ulid', 'owner'))->toBe('varchar')
+    expect(Schema::getColumnType('ok_ulid', 'owner'))->toBe(expectedKeyColumnType(KeyType::Ulid))
         ->and(hasColumnIndex('ok_ulid', 'owner'))->toBeFalse();
 });
 
@@ -64,7 +64,7 @@ it('emits a morph key pair of the right id type', function (): void {
 
     expect(Schema::hasColumn('ok_morph', 'subject_type'))->toBeTrue()
         ->and(Schema::hasColumn('ok_morph', 'subject_id'))->toBeTrue()
-        ->and(Schema::getColumnType('ok_morph', 'subject_id'))->toBe('varchar');
+        ->and(Schema::getColumnType('ok_morph', 'subject_id'))->toBe(expectedKeyColumnType(KeyType::Uuid));
 });
 
 it('emits a plain bigint morph key', function (): void {
@@ -74,7 +74,7 @@ it('emits a plain bigint morph key', function (): void {
     });
 
     expect(Schema::hasColumn('ok_morph', 'subject_type'))->toBeTrue()
-        ->and(Schema::getColumnType('ok_morph', 'subject_id'))->toBe('integer');
+        ->and(Schema::getColumnType('ok_morph', 'subject_id'))->toBe(expectedKeyColumnType(KeyType::BigInt));
 });
 
 it('emits a nullable bigint morph key', function (): void {
@@ -83,7 +83,7 @@ it('emits a nullable bigint morph key', function (): void {
         $table->morphKey('subject', KeyType::BigInt, nullable: true);
     });
 
-    expect(Schema::getColumnType('ok_morph', 'subject_id'))->toBe('integer');
+    expect(Schema::getColumnType('ok_morph', 'subject_id'))->toBe(expectedKeyColumnType(KeyType::BigInt));
 });
 
 it('adds the auditable timestamp and soft-delete columns', function (): void {
@@ -104,5 +104,5 @@ it('adds a polymorphic subject column pair', function (): void {
     });
 
     expect(Schema::hasColumn('ok_subject', 'owner_type'))->toBeTrue()
-        ->and(Schema::getColumnType('ok_subject', 'owner_id'))->toBe('varchar');
+        ->and(Schema::getColumnType('ok_subject', 'owner_id'))->toBe(expectedKeyColumnType(KeyType::Ulid));
 });
