@@ -1,8 +1,10 @@
+<!-- roundly-hero:start -->
 <p align="center">
-    <a href="https://roundly-consulting.com/open-source">
-        <img src="art/hero.png" alt="Package Toolkit for Laravel — Roundly open source" width="100%">
-    </a>
+  <a href="https://roundly-consulting.com/open-source/docs/package-toolkit-for-laravel?utm_source=github&utm_medium=readme&utm_campaign=open-source&utm_content=package-toolkit-for-laravel">
+    <img src="art/hero.png" alt="Package Toolkit for Laravel — Roundly open source" width="100%">
+  </a>
 </p>
+<!-- roundly-hero:end -->
 
 # Package Toolkit for Laravel
 
