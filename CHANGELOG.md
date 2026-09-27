@@ -1,35 +1,26 @@
 # Changelog
 
-All notable changes to `package-toolkit-for-laravel` will be documented in this file.
+All notable changes to `package-toolkit-for-laravel` are documented in this file. The format follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
+[Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
-### Removed
-
-- **`Support\LockedUpdate`** — removed. The helper turned relative writes
-  (`usage = usage + 1`) into stale absolute writes, always opened its own
-  transaction, always saved with timestamps, and used `firstOrFail()` — a
-  lost-update hazard on money boundaries. It had no callers. Use
-  `DB::transaction()` + `lockForUpdate()` (with a relative `increment()`/raw
-  update) directly.
+Initial public release.
 
 ### Added
 
-- **`Config::enum()`** — a strict backed-enum accessor that throws
-  `InvalidConfigurationException` when the configured value is missing or
-  unrecognized, so an env typo cannot silently downgrade a security parameter.
-  `enumOr()` stays for genuinely optional values.
-- **`Config::for($array, $exception)` / `Config::using($exception)`** and the
-  underlying `Support\ConfigValidator` — validate the values inside an array a
-  DTO was handed (a `fromArray()`) instead of reading the global repository by
-  key, and nominate the exception class thrown on failure so a package's own
-  hierarchy (`PasskeyException`, …) is preserved.
-
-### Changed
-
-- `Config`'s existing repository accessors (`intBetween`, `requireString`,
-  `enumOr`, `boolean`) now delegate to `ConfigValidator` — behavior and messages
-  are unchanged.
-- `DatabaseDriver::current()` docblock now states the rule: use it on
-  boot/console/migration paths; on request paths use `tryFrom()` with a portable
-  fallback, since the enum is closed while Laravel's driver set is not.
+- A fluent package-bootstrap builder: extend `PackageServiceProvider` and declare config,
+  migrations, translations, views, routes, commands, facade aliases and an `about` section in
+  `configurePackage()`.
+- Publish-only migrations, timestamp-injected in directory order and republished in place.
+- Register-time helpers `bindFromConfig()` and `observesModel()`, plus the idempotent
+  `InteractsWithGates`, `RegistersBladeDirectives` and `RegistersBlueprintMacros` traits.
+- A config-driven `KeyType` (`bigint` / `uuid` / `ulid`) with the `ownerKey()`, `morphKey()`,
+  `auditable()` and `polymorphicSubject()` Blueprint macros.
+- A portable, injection-safe `whereLikeEscaped()` query macro and a `DatabaseDriver` enum.
+- Validate-or-throw config accessors (`Config::intBetween()`, `requireString()`, `enum()`,
+  `enumOr()`, `boolean()`), including `Config::for()` to validate a DTO's input array with your
+  own exception class.
+- `ModelResolver` to resolve and validate model classes named in config.
+- A PHPStan extension that declares the Blueprint and query macros for static analysis.
