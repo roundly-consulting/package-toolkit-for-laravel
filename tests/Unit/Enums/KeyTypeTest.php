@@ -10,8 +10,8 @@ it('maps canonical values', function (): void {
         ->and(KeyType::fromValue('ulid'))->toBe(KeyType::Ulid);
 });
 
-it('accepts the id alias for bigint', function (): void {
-    expect(KeyType::fromValue('id'))->toBe(KeyType::BigInt);
+it('treats id as an unrecognized value, not a bigint synonym', function (): void {
+    expect(KeyType::fromValue('id', KeyType::Ulid))->toBe(KeyType::Ulid);
 });
 
 it('is case- and whitespace-insensitive', function (): void {
@@ -35,10 +35,4 @@ it('falls back when the config value is missing or not a string', function (): v
 
     config()->set('toolbox.key_type', ['array']);
     expect(KeyType::fromConfig('toolbox.key_type', KeyType::Uuid))->toBe(KeyType::Uuid);
-});
-
-it('accepts the id alias through config', function (): void {
-    config()->set('toolbox.key_type', 'id');
-
-    expect(KeyType::fromConfig('toolbox.key_type'))->toBe(KeyType::BigInt);
 });

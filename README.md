@@ -172,8 +172,7 @@ final class CommentsServiceProvider extends PackageServiceProvider
 
 Register the macros with `RegistersBlueprintMacros` (see above), then use them
 in migrations. `KeyType` resolves the host's chosen key strategy from config,
-falling back **silently** to `bigint` for any unrecognized value (the alias
-`'id'` is accepted as a synonym for `'bigint'`):
+falling back **silently** to `bigint` for any unrecognized value:
 
 ```php
 use RoundlyConsulting\PackageToolkit\Enums\KeyType;
