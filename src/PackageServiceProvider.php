@@ -187,7 +187,8 @@ abstract class PackageServiceProvider extends ServiceProvider
      * preserving the package directory's order (a package's migrations often
      * depend on each other's tables). Republishing lands on the file it landed on
      * last time, so a second publish overwrites in place instead of creating a
-     * duplicate migration.
+     * duplicate migration — and only that file: a same-named host migration with
+     * different contents is never a destination (see {@see MigrationPublisher}).
      */
     protected function publishPackageMigrations(): void
     {
@@ -200,7 +201,7 @@ abstract class PackageServiceProvider extends ServiceProvider
         foreach ($sources as $file) {
             $this->publishes([
                 $file => MigrationPublisher::destination(
-                    MigrationPublisher::nameFor($file),
+                    $file,
                     $directory,
                     $timestamp->copy()->addSeconds($offset++),
                 ),
@@ -208,9 +209,11 @@ abstract class PackageServiceProvider extends ServiceProvider
         }
 
         foreach ($this->package->migrationStubs as $stub) {
+            $source = $this->package->migrationStubPath($stub->name);
+
             $this->publishes([
-                $this->package->migrationStubPath($stub->name) => MigrationPublisher::destination(
-                    MigrationPublisher::nameFor($stub->name),
+                $source => MigrationPublisher::destination(
+                    $source,
                     $directory,
                     $timestamp->copy()->addSeconds($offset++),
                 ),
