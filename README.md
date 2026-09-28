@@ -30,9 +30,10 @@ database/config/model helpers — using only official Laravel and Symfony APIs.
 - **`KeyType` + Blueprint macros** — one config-driven key strategy
   (`bigint`/`uuid`/`ulid`) with `ownerKey()`, `morphKey()`, `auditable()`, and
   `polymorphicSubject()` schema macros.
-- **Database helpers** — a `DatabaseDriver` enum, a portable, injection-safe
-  `whereLikeEscaped()` search, config validate-or-throw accessors (including a
-  strict enum accessor and an array-validating entry point), and a model
+- **Database helpers** — a `DatabaseDriver` enum, an injection-safe
+  `whereLikeEscaped()` search that works on every Laravel database driver,
+  config accessors (validate-or-throw, a strict enum accessor, lenient
+  fall-back variants, and an array-validating entry point), and a model
   resolver.
 
 ## Requirements
@@ -115,6 +116,14 @@ already published to, so `vendor:publish --tag=comments-migrations --force`
 overwrites in place instead of dropping a second, differently timestamped copy of
 the same `Schema::create()`.
 
+A file only counts as the earlier copy when it has the same name **and** the
+package source's contents (whitespace differences such as line endings are
+ignored). A same-named migration with different contents — your app's own
+`create_comments_table`, another package's, or a copy you edited after
+publishing — is never overwritten, not even with `--force`: the package's
+migration is published beside it under a fresh timestamp, and you decide which
+one to keep.
+
 A package's own test suite must therefore run its migrations explicitly (e.g.
 `$this->loadMigrationsFrom(__DIR__.'/../database/migrations')` in `TestCase`).
 
@@ -172,13 +181,14 @@ final class CommentsServiceProvider extends PackageServiceProvider
 ## Key types & schema macros
 
 Register the macros with `RegistersBlueprintMacros` (see above), then use them
-in migrations. `KeyType` resolves the host's chosen key strategy from config,
-falling back **silently** to `bigint` for any unrecognized value:
+in migrations. `KeyType` resolves the host's chosen key strategy from config —
+a `KeyType` case or its (case-insensitive) string value — falling back
+**silently** to `bigint` for any unrecognized value:
 
 ```php
 use RoundlyConsulting\PackageToolkit\Enums\KeyType;
 
-$type = KeyType::fromConfig('comments.key_type'); // bigint | uuid | ulid
+$type = KeyType::fromConfig('comments.key_type'); // KeyType::BigInt | KeyType::Uuid | KeyType::Ulid
 
 Schema::create('comments', function (Blueprint $table) use ($type): void {
     $table->id();
@@ -232,20 +242,35 @@ use RoundlyConsulting\PackageToolkit\Support\ModelResolver;
 DatabaseDriver::current()->isPgsql();                                  // boot/console
 DatabaseDriver::tryFrom($driver)?->isPgsql() ?? false;                 // request path
 
-// Portable, injection-safe "contains" search (LIKE / ILIKE with ESCAPE '\').
+// Injection-safe "contains" search: ILIKE on Postgres, LIKE on every other
+// driver (sqlsrv included), with the user's % _ \ escaped via ESCAPE '\'.
 Comment::query()->whereLikeEscaped('body', $term);
 
 // Validate-or-throw config accessors (throw InvalidConfigurationException).
-Config::intBetween('comments.per_page', 1, 100, 20);
+Config::intBetween('comments.per_page', 1, 100, 20);                   // '20' from env → 20; '--5' or '1.5' throws
 Config::requireString('comments.table');
-Config::enumOr('comments.key_type', KeyType::class, KeyType::BigInt);  // lenient: falls back
 Config::enum('comments.hash_algo', HashAlgorithm::class);              // strict: throws on a typo
-Config::boolean('comments.enabled', true);
+
+// Lenient accessors: fall back to the default, never throw.
+Config::enumOr('comments.key_type', KeyType::class, KeyType::BigInt);  // unknown value → KeyType::BigInt
+Config::boolean('comments.enabled', true);                             // '1'/'true'/'on'/'yes' → true; 'ture' → the default
 
 // Resolve + validate a model class from config.
 $class = ModelResolver::for('comments.models.comment');       // class-string<Model>
 $model = ModelResolver::newModel('comments.models.comment');
 ```
+
+`whereLikeEscaped()` never throws for a driver the `DatabaseDriver` enum does not
+model. On SQL Server it also escapes `[`, which T-SQL reads as a character class.
+Case-insensitivity comes from `ILIKE` on Postgres; elsewhere it follows the
+engine — SQLite's `LIKE` folds ASCII only, and MySQL, MariaDB and SQL Server
+follow the column's collation (their default collations are case-insensitive).
+
+Both enum accessors coerce the value to the enum's backing type first — every env
+value is a string, so `'2'` resolves a case of an int-backed enum, and an int
+resolves a numeric string-backed case. A value that cannot be coerced (`'2.0'`, a
+float, a bool) is simply unrecognized: `enum()` throws, `enumOr()` falls back.
+Neither ever lets a `TypeError` escape.
 
 ### Validating a DTO's input, with your own exception
 
@@ -285,7 +310,8 @@ carry a retry-after hint.
 
 - `PackageToolkitException` — base for everything the toolkit throws.
 - `InvalidConfigurationException` — a config value is missing, of the wrong
-  type, out of range, or not a model class.
+  type, out of range, not one of an enum's cases, or not a model class; also
+  thrown by `DatabaseDriver::current()` for a driver the enum does not model.
 
 ## Migrating an existing package to the toolkit
 
