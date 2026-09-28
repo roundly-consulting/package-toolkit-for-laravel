@@ -36,3 +36,11 @@ it('falls back when the config value is missing or not a string', function (): v
     config()->set('toolbox.key_type', ['array']);
     expect(KeyType::fromConfig('toolbox.key_type', KeyType::Uuid))->toBe(KeyType::Uuid);
 });
+
+it('honours a KeyType case written straight into config', function (KeyType $type): void {
+    // `'key_type' => KeyType::Uuid` in a host's config file must not silently
+    // become bigint columns.
+    config()->set('toolbox.key_type', $type);
+
+    expect(KeyType::fromConfig('toolbox.key_type', KeyType::BigInt))->toBe($type);
+})->with([KeyType::Uuid, KeyType::Ulid, KeyType::BigInt]);

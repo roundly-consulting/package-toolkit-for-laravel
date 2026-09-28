@@ -22,17 +22,20 @@ enum KeyType: string
     case Ulid = 'ulid';
 
     /**
-     * Resolve the key type from a config value, silently falling back to
-     * `$default` for any unrecognized value (misconfiguration never throws —
-     * the package keeps working on the safe bigint default).
+     * Resolve the key type from a config value — a `KeyType` case or its string
+     * value — silently falling back to `$default` for any unrecognized value
+     * (misconfiguration never throws — the package keeps working on the safe
+     * bigint default).
      */
     public static function fromConfig(string $key, self $default = self::BigInt): self
     {
         $value = config($key);
 
-        return is_string($value)
-            ? self::fromValue($value, $default)
-            : $default;
+        return match (true) {
+            $value instanceof self => $value,
+            is_string($value) => self::fromValue($value, $default),
+            default => $default,
+        };
     }
 
     /**
