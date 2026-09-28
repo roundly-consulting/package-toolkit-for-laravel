@@ -6,6 +6,8 @@ use RoundlyConsulting\PackageToolkit\Enums\KeyType;
 use RoundlyConsulting\PackageToolkit\Exceptions\InvalidConfigurationException;
 use RoundlyConsulting\PackageToolkit\Support\Config;
 use RoundlyConsulting\PackageToolkit\Tests\Fixtures\CustomConfigException;
+use RoundlyConsulting\PackageToolkit\Tests\Fixtures\Priority;
+use RoundlyConsulting\PackageToolkit\Tests\Fixtures\Version;
 
 describe('intBetween', function (): void {
     it('returns an in-range value', function (): void {
@@ -175,4 +177,93 @@ describe('nominated exception class', function (): void {
     it('preserves the toolkit exception message when none is nominated', function (): void {
         Config::for(['timeout' => 99999])->intBetween('timeout', 1, 300, 60);
     })->throws(InvalidConfigurationException::class, 'between 1 and 300');
+});
+
+describe('enum backing-type coercion', function (): void {
+    // strict_types makes Priority::tryFrom('2') a TypeError, and every env value is a
+    // string — so an int-backed enum read from env must be coerced, never passed raw.
+    it('coerces a numeric env string into an int-backed case', function (string $value, Priority $expected): void {
+        config()->set('toolbox.priority', $value);
+
+        expect(Config::enum('toolbox.priority', Priority::class))->toBe($expected)
+            ->and(Config::enumOr('toolbox.priority', Priority::class, Priority::Low))->toBe($expected)
+            ->and(Config::for(['priority' => $value])->enum('priority', Priority::class))->toBe($expected);
+    })->with([
+        ['2', Priority::High],
+        ['-1', Priority::Below],
+        [' 1 ', Priority::Low],
+    ]);
+
+    it('accepts a native int for an int-backed enum', function (): void {
+        config()->set('toolbox.priority', 2);
+
+        expect(Config::enum('toolbox.priority', Priority::class))->toBe(Priority::High);
+    });
+
+    it('coerces an int into a string-backed case', function (): void {
+        config()->set('toolbox.version', 2);
+
+        expect(Config::enum('toolbox.version', Version::class))->toBe(Version::Two)
+            ->and(Config::enumOr('toolbox.version', Version::class, Version::One))->toBe(Version::Two);
+    });
+
+    it('lets enumOr fall back instead of crashing on a mismatched type', function (mixed $value): void {
+        config()->set('toolbox.priority', $value);
+        config()->set('toolbox.kt', $value);
+
+        expect(Config::enumOr('toolbox.priority', Priority::class, Priority::Low))->toBe(Priority::Low)
+            ->and(Config::enumOr('toolbox.kt', KeyType::class, KeyType::Ulid))->toBe(KeyType::Ulid);
+    })->with([
+        'unknown int' => [1],
+        'non-numeric string' => ['high'],
+        'malformed number' => ['--2'],
+        'decimal string' => ['2.0'],
+        'float' => [2.0],
+        'bool' => [true],
+        'overflowing number' => ['99999999999999999999'],
+    ]);
+
+    it('throws the configuration exception, never a TypeError, for a mismatched type', function (mixed $value): void {
+        config()->set('toolbox.priority', $value);
+
+        expect(fn () => Config::enum('toolbox.priority', Priority::class))
+            ->toThrow(InvalidConfigurationException::class, 'must be one of [1, 2, -1]');
+    })->with([
+        ['high'],
+        ['2.0'],
+        ['--2'],
+        [2.5],
+        [['2']],
+    ]);
+
+    it('throws the configuration exception for an int no string-backed case matches', function (): void {
+        config()->set('toolbox.kt', 1);
+
+        Config::enum('toolbox.kt', KeyType::class);
+    })->throws(InvalidConfigurationException::class, 'must be one of [bigint, uuid, ulid]');
+
+    it('throws the nominated exception for a mismatched type', function (): void {
+        Config::for(['priority' => 'x'], CustomConfigException::class)->enum('priority', Priority::class);
+    })->throws(CustomConfigException::class, 'must be one of [1, 2, -1]');
+});
+
+describe('intBetween rejects malformed numbers', function (): void {
+    it('throws instead of silently coercing', function (string $value): void {
+        config()->set('toolbox.n', $value);
+
+        Config::intBetween('toolbox.n', -10, 10, 3);
+    })->throws(InvalidConfigurationException::class, 'must be an integer')->with([
+        ['--5'],
+        ['-'],
+        ['5-'],
+        ['-5-'],
+        ['1.5'],
+        ['99999999999999999999'],
+    ]);
+
+    it('accepts a signed integer string', function (): void {
+        config()->set('toolbox.n', '-5');
+
+        expect(Config::intBetween('toolbox.n', -10, 10, 3))->toBe(-5);
+    });
 });
