@@ -68,6 +68,14 @@ it('falls back to the class base name for a nonsense config value', function ():
     expect(registerAlias(42))->toBe(['Gadget' => Gadget::class]);
 });
 
+it('skips the alias for an env-style string that parses as false', function (mixed $configured): void {
+    expect(registerAlias($configured))->toBe([]);
+})->with(['off', '0', 'no', 'false', 'OFF', ' no ', '   ', 0]);
+
+it('falls back to the class base name for an env-style string that parses as true', function (mixed $configured): void {
+    expect(registerAlias($configured))->toBe(['Gadget' => Gadget::class]);
+})->with(['1', 'on', 'yes', 'true', 'ON', 1]);
+
 it('registers an undeclared alias without any config key', function (): void {
     AliasLoader::getInstance()->setAliases([]);
 

@@ -11,6 +11,7 @@ use RoundlyConsulting\PackageToolkit\Declarations\FacadeAliasDeclaration;
 use RoundlyConsulting\PackageToolkit\Declarations\MigrationStubDeclaration;
 use RoundlyConsulting\PackageToolkit\Declarations\RouteDeclaration;
 use RoundlyConsulting\PackageToolkit\Declarations\StubDeclaration;
+use RoundlyConsulting\PackageToolkit\Support\Config;
 
 /**
  * Fluent description of what a package ships: its config, migrations, views,
@@ -142,7 +143,10 @@ final class Package
 
     /**
      * Load a route file (optionally gated behind a boolean config key) and
-     * publish it under the `<name>-routes` tag.
+     * publish it under the `<name>-routes` tag. The switch is parsed like
+     * {@see Config::boolean()} with a `true` default: `false`, `0`, `''`, `'0'`,
+     * `'false'`, `'off'` and `'no'` skip the file; `true`, `'1'`, `'on'`,
+     * `'yes'`, an absent key, `null` or an unparseable value load it.
      */
     public function hasRoutes(string $file, ?string $enabledVia = null): self
     {
@@ -169,9 +173,11 @@ final class Package
 
     /**
      * Register a class alias, optionally driven by a config key. The config
-     * value decides: `false`, `null` or `''` skip the alias entirely; a
-     * non-empty string is used as the alias name; `true` (or an absent key)
-     * falls back to the class's base name — as does any unrecognized value.
+     * value decides: `null` or anything {@see Config::boolean()} reads as
+     * false (`false`, `0`, `''`, `'0'`, `'false'`, `'off'`, `'no'`) skips the alias
+     * entirely; any other non-empty string is used as the alias name; `true`
+     * (or `'1'`, `'on'`, `'yes'`, or an absent key) falls back to the class's
+     * base name — as does any unrecognized value.
      *
      * @param  class-string  $class
      */

@@ -88,9 +88,9 @@ for a non-standard layout.
 | `hasMigration(string $name)` | Publish a single `database/migrations/<name>.php.stub` under `<name>-migrations`, timestamp-injected. Use only for a `.php.stub` source; `.php` files are picked up by `hasMigrations()`. |
 | `hasTranslations()` | Load + publish translations (published to `lang/vendor/<name>`, tag `<name>-translations`). |
 | `hasViews(?string $namespace = null)` | Register + publish Blade views (namespace defaults to `<name>`, tag `<name>-views`). |
-| `hasRoutes(string $file, ?string $enabledVia = null)` | Load a route file (optionally gated behind a boolean config key) and publish it under `<name>-routes`. |
+| `hasRoutes(string $file, ?string $enabledVia = null)` | Load a route file (optionally gated behind a boolean config key) and publish it under `<name>-routes`. The switch is parsed like `Config::boolean()`: `false`/`0`/`'off'`/`'no'`/`'false'`/`''` skip the file; `true`/`'1'`/`'on'`/`'yes'`, an absent key or an unparseable value load it. |
 | `hasCommands(array $commands)` | Register console commands (console only). |
-| `hasFacadeAlias(string $class, ?string $configKey = null)` | Register a class alias. The config value decides: `false`/`null`/`''` skip it, a non-empty string renames it, `true` or an absent key (or any unrecognized value) use the class's base name. |
+| `hasFacadeAlias(string $class, ?string $configKey = null)` | Register a class alias. The config value decides: `null` or a false-like value (`false`/`0`/`''`/`'0'`/`'false'`/`'off'`/`'no'`) skips it, any other non-empty string renames it, `true`/`'1'`/`'on'`/`'yes'` or an absent key (or any unrecognized value) use the class's base name. |
 | `contributesToAbout(?Closure $data = null)` | Add a section to `php artisan about`. |
 | `publishesStubs(string $from, string $to, string $tag)` | Publish an arbitrary set of files under a custom tag. |
 
