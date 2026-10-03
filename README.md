@@ -32,10 +32,10 @@ database/config/model helpers — using only official Laravel and Symfony APIs.
   `polymorphicSubject()` schema macros.
 - **Database helpers** — a `DatabaseDriver` enum, an injection-safe
   `whereLikeEscaped()` search that works on every Laravel database driver,
-  config accessors (validate-or-throw integer, string, enum and boolean
-  readers — `boolean()` throws on a typo such as `'disabled'` instead of reading
-  it as the default — a lenient `enumOr()`, and an array-validating entry
-  point), and a model resolver.
+  strict config readers (integer, string, enum, fixed-vocabulary string and
+  boolean — a present but invalid value always throws, the default applies only
+  to an absent key — plus an array-validating entry point), and a model
+  resolver that refuses a model not extending the packaged one.
 
 ## Requirements
 
@@ -242,6 +242,7 @@ includes:
 ## Database & config helpers
 
 ```php
+use Illuminate\Database\Eloquent\Model;
 use RoundlyConsulting\PackageToolkit\Enums\DatabaseDriver;
 use RoundlyConsulting\PackageToolkit\Support\Config;
 use RoundlyConsulting\PackageToolkit\Support\ModelResolver;
@@ -256,19 +257,24 @@ DatabaseDriver::tryFrom($driver)?->isPgsql() ?? false;                 // reques
 // driver (sqlsrv included), with the user's % _ \ escaped via ESCAPE '\'.
 Comment::query()->whereLikeEscaped('body', $term);
 
-// Validate-or-throw config accessors (throw InvalidConfigurationException).
-Config::intBetween('comments.per_page', 1, 100, 20);                   // '20' from env → 20; '--5' or '1.5' throws
-Config::requireString('comments.table');
-Config::enum('comments.hash_algo', HashAlgorithm::class);              // strict: throws on a typo
-Config::boolean('comments.allow_guests', false);                       // '1'/'true'/'on'/'yes' → true; 'ture' throws; absent/null → the default
+// Strict config readers: the default applies only to an absent (null) key; a present but
+// invalid value throws InvalidConfigurationException naming the key and the value.
+Config::integer('comments.per_page', 20, min: 1, max: 100);                 // '20' → 20; 'five', '5.5', '1e3', '' throw
+Config::requireString('comments.table');                                    // missing or blank throws
+Config::enum('comments.hash_algo', HashAlgorithm::class);                   // no default: missing throws too
+Config::enum('comments.sort', Sort::class, Sort::Newest);                   // absent → Sort::Newest; 'neweset' throws
+Config::oneOf('comments.renderer', ['markdown', 'plain'], 'markdown');      // absent → 'markdown'; 'html' throws
+Config::boolean('comments.allow_guests', false);                            // 'on'/'off' etc.; 'ture' throws
 
-// Lenient accessor: falls back to the default, never throws.
-Config::enumOr('comments.key_type', KeyType::class, KeyType::BigInt);  // unknown value → KeyType::BigInt
-
-// Resolve + validate a model class from config.
-$class = ModelResolver::for('comments.models.comment');       // class-string<Model>
-$model = ModelResolver::newModel('comments.models.comment');
+// Resolve + validate a model class from config: absent → the packaged default; anything
+// that isn't that class or a subclass of it throws (never a silent fall-back).
+$class = ModelResolver::for('comments.model', Comment::class);              // class-string<Comment>
+$model = ModelResolver::newModel('comments.model', Comment::class);
+$tenant = ModelResolver::for('comments.tenant_model', Team::class, base: Model::class); // any model
 ```
+
+Every message has one shape — `Configuration value [comments.per_page] must be between 1 and
+100, [500] given.` — so the key and the offending value are always in front of the reader.
 
 `whereLikeEscaped()` never throws for a driver the `DatabaseDriver` enum does not
 model. On SQL Server it also escapes `[`, which T-SQL reads as a character class.
@@ -276,11 +282,17 @@ Case-insensitivity comes from `ILIKE` on Postgres; elsewhere it follows the
 engine — SQLite's `LIKE` folds ASCII only, and MySQL, MariaDB and SQL Server
 follow the column's collation (their default collations are case-insensitive).
 
-Both enum accessors coerce the value to the enum's backing type first — every env
-value is a string, so `'2'` resolves a case of an int-backed enum, and an int
-resolves a numeric string-backed case. A value that cannot be coerced (`'2.0'`, a
-float, a bool) is simply unrecognized: `enum()` throws, `enumOr()` falls back.
-Neither ever lets a `TypeError` escape.
+**Integers** are an `int` or a canonical integer string: an optional `-`, decimal digits,
+surrounding whitespace ignored (`'30'`, `'-5'`, `' 30 '`). `'five'`, `'5.5'`, `'5abc'`, `''`,
+`'1e3'`, `'0x10'`, `'+5'`, an overflowing number, a float, a bool or an array throw. A range
+check applies to the default too.
+
+**Enums** match a case, or its backing value exactly and case-sensitively (`'UUID'` does not
+match `'uuid'`). The value is coerced to the backing type first — every env value is a string,
+so `'2'` resolves a case of an int-backed enum (by the integer rules above), and an int resolves
+a numeric string-backed case. Anything else throws, listing the allowed values, even when a
+default is given; a `TypeError` never escapes. `oneOf()` is the same contract for a plain string
+vocabulary with no enum.
 
 ### Validating a DTO's input, with your own exception
 
@@ -301,7 +313,7 @@ final readonly class PasskeyConfig
         $v = Config::for($config, PasskeyException::class);
 
         return new self(
-            timeout: $v->intBetween('timeout', 1, 300, 60),   // validates the 99999 you were handed
+            timeout: $v->integer('timeout', 60, min: 1, max: 300), // validates the 99999 you were handed
             trust: $v->enum('attestation', TrustMode::class), // a typo throws PasskeyException, never a silent downgrade
             rpId: $v->requireString('rp_id'),
         );
@@ -312,8 +324,8 @@ final readonly class PasskeyConfig
 `Config::using(MyException::class)` gives the same nominated-exception validator
 while still reading the global repository, for config a package owns outright.
 
-Both validators have every reader the static accessors have — `intBetween()`,
-`requireString()`, `enum()`, `enumOr()` and `boolean()` — so a switch in a
+Both validators have every reader the static accessors have — `integer()`,
+`requireString()`, `enum()`, `oneOf()` and `boolean()` — so a switch in a
 handed array fails loudly too:
 
 ```php

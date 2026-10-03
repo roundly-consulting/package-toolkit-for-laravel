@@ -24,9 +24,11 @@ Initial public release.
   `ownerKey()`, `morphKey()`, `auditable()` and `polymorphicSubject()` Blueprint macros.
 - An injection-safe `whereLikeEscaped()` query macro that works on every Laravel database
   driver, and a `DatabaseDriver` enum.
-- Validate-or-throw config accessors (`Config::intBetween()`, `requireString()`, `enum()`,
-  `boolean()` — env-style booleans, where a typo throws instead of reading as the default) and
-  the lenient fall-back `enumOr()`, coercing env strings to the expected type, including
-  `Config::for()` to validate a DTO's input array with your own exception class.
-- `ModelResolver` to resolve and validate model classes named in config.
+- Strict config readers — `Config::integer()` (canonical integer strings only, optional
+  bounds), `requireString()`, `enum()` (optional default), `oneOf()` and `boolean()`: the
+  default applies only to an absent key, and a present but invalid value throws a message
+  naming the key and the value. `Config::for()` / `using()` validate a DTO's input array or
+  throw your own exception class.
+- `ModelResolver` to resolve model classes named in config, refusing any class that isn't the
+  packaged model or a subclass of it (or an explicitly widened base).
 - A PHPStan extension that declares the Blueprint and query macros for static analysis.
