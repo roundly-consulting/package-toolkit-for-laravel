@@ -11,6 +11,7 @@ use RoundlyConsulting\PackageToolkit\Declarations\FacadeAliasDeclaration;
 use RoundlyConsulting\PackageToolkit\Declarations\MigrationStubDeclaration;
 use RoundlyConsulting\PackageToolkit\Declarations\RouteDeclaration;
 use RoundlyConsulting\PackageToolkit\Declarations\StubDeclaration;
+use RoundlyConsulting\PackageToolkit\Exceptions\InvalidConfigurationException;
 use RoundlyConsulting\PackageToolkit\Support\Config;
 
 /**
@@ -143,10 +144,12 @@ final class Package
 
     /**
      * Load a route file (optionally gated behind a boolean config key) and
-     * publish it under the `<name>-routes` tag. The switch is parsed like
-     * {@see Config::boolean()} with a `true` default: `false`, `0`, `''`, `'0'`,
-     * `'false'`, `'off'` and `'no'` skip the file; `true`, `'1'`, `'on'`,
-     * `'yes'`, an absent key, `null` or an unparseable value load it.
+     * publish it under the `<name>-routes` tag. The switch is read strictly at
+     * boot, via {@see Config::strictBoolean()} with a `true` default: `false`,
+     * `0`, `''`, `'0'`, `'false'`, `'off'` and `'no'` skip the file; `true`, `1`,
+     * `'1'`, `'true'`, `'on'`, `'yes'`, an absent key or `null` load it; anything
+     * else (`'disabled'`, `'ture'`, `2`) throws
+     * {@see InvalidConfigurationException} rather than loading the routes.
      */
     public function hasRoutes(string $file, ?string $enabledVia = null): self
     {
@@ -173,11 +176,12 @@ final class Package
 
     /**
      * Register a class alias, optionally driven by a config key. The config
-     * value decides: `null` or anything {@see Config::boolean()} reads as
-     * false (`false`, `0`, `''`, `'0'`, `'false'`, `'off'`, `'no'`) skips the alias
-     * entirely; any other non-empty string is used as the alias name; `true`
-     * (or `'1'`, `'on'`, `'yes'`, or an absent key) falls back to the class's
-     * base name — as does any unrecognized value.
+     * value is read strictly at register time, via {@see Config::strictBoolean()}:
+     * `null` or a false spelling (`false`, `0`, `''`, `'0'`, `'false'`, `'off'`,
+     * `'no'`) skips the alias entirely; a true spelling (`true`, `1`, `'1'`,
+     * `'true'`, `'on'`, `'yes'`) or an absent key uses the class's base name; any
+     * other non-empty string is used as the alias name. Anything else (`2`, `1.5`,
+     * an array) throws {@see InvalidConfigurationException}.
      *
      * @param  class-string  $class
      */

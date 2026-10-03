@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use RoundlyConsulting\PackageToolkit\Exceptions\InvalidConfigurationException;
 use RoundlyConsulting\PackageToolkit\Package;
 use RoundlyConsulting\PackageToolkit\PackageServiceProvider;
 
@@ -33,18 +34,45 @@ function bootsGatedRoute(mixed $configured): bool
     $provider->register();
     $provider->boot();
 
+    return gatedRouteIsRegistered();
+}
+
+function gatedRouteIsRegistered(): bool
+{
     return collect(app('router')->getRoutes()->getRoutes())
         ->contains(static fn ($route): bool => $route->uri() === 'toolbox/disabled');
 }
 
 it('skips the route for an env-style string that parses as false', function (mixed $configured): void {
     expect(bootsGatedRoute($configured))->toBeFalse();
-})->with(['off', '0', 'no', 'false', 'OFF', ' no ', '', 0, false]);
+})->with(['off', '0', 'no', 'false', 'OFF', 'No', ' no ', "false\n", '', 0, false]);
 
 it('loads the route for an env-style string that parses as true', function (mixed $configured): void {
     expect(bootsGatedRoute($configured))->toBeTrue();
-})->with(['1', 'on', 'yes', 'true', 'ON', 1, true]);
+})->with(['1', 'on', 'yes', 'true', 'ON', 'Yes', ' on ', "true\n", 1, true]);
 
-it('falls back to loading the route when the switch is missing or unparseable', function (mixed $configured): void {
+it('loads the route when the switch is absent or null', function (mixed $configured): void {
     expect(bootsGatedRoute($configured))->toBeTrue();
-})->with(['__absent__', null, 'maybe', 'ture', 42]);
+})->with(['__absent__', null]);
+
+it('refuses to boot on an unparseable route switch instead of loading the routes', function (mixed $configured, string $given): void {
+    try {
+        bootsGatedRoute($configured);
+    } catch (InvalidConfigurationException $e) {
+        expect($e->getMessage())->toBe(
+            "Configuration value [route_fixture.enabled] must be a boolean (true/false, 1/0, on/off or yes/no), [{$given}] given.",
+        )->and(gatedRouteIsRegistered())->toBeFalse();
+
+        return;
+    }
+
+    $this->fail('An unparseable route switch booted without throwing.');
+})->with([
+    'a word' => ['disabled', 'disabled'],
+    'a typo' => ['ture', 'ture'],
+    'a maybe' => ['maybe', 'maybe'],
+    'a number string' => ['2', '2'],
+    'an integer' => [42, '42'],
+    'a float' => [1.5, '1.5'],
+    'an array' => [['x'], 'array'],
+]);

@@ -89,9 +89,9 @@ for a non-standard layout.
 | `hasMigration(string $name)` | Publish a single `database/migrations/<name>.php.stub` under `<name>-migrations`, timestamp-injected. Use only for a `.php.stub` source; `.php` files are picked up by `hasMigrations()`. |
 | `hasTranslations()` | Load + publish translations (published to `lang/vendor/<name>`, tag `<name>-translations`). |
 | `hasViews(?string $namespace = null)` | Register + publish Blade views (namespace defaults to `<name>`, tag `<name>-views`). |
-| `hasRoutes(string $file, ?string $enabledVia = null)` | Load a route file (optionally gated behind a boolean config key) and publish it under `<name>-routes`. The switch is parsed like `Config::boolean()`: `false`/`0`/`'off'`/`'no'`/`'false'`/`''` skip the file; `true`/`'1'`/`'on'`/`'yes'`, an absent key or an unparseable value load it. |
+| `hasRoutes(string $file, ?string $enabledVia = null)` | Load a route file (optionally gated behind a boolean config key) and publish it under `<name>-routes`. The switch is read strictly, like `Config::strictBoolean()`: `false`/`0`/`'off'`/`'no'`/`'false'`/`''` skip the file; `true`/`1`/`'on'`/`'yes'`/`'true'`, an absent key or `null` load it; anything else (`'disabled'`, `'ture'`, `2`) throws `InvalidConfigurationException` at boot, so a typo never loads the routes. |
 | `hasCommands(array $commands)` | Register console commands (console only). |
-| `hasFacadeAlias(string $class, ?string $configKey = null)` | Register a class alias. The config value decides: `null` or a false-like value (`false`/`0`/`''`/`'0'`/`'false'`/`'off'`/`'no'`) skips it, any other non-empty string renames it, `true`/`'1'`/`'on'`/`'yes'` or an absent key (or any unrecognized value) use the class's base name. |
+| `hasFacadeAlias(string $class, ?string $configKey = null)` | Register a class alias. The config value decides: `null` or a false spelling (`false`/`0`/`''`/`'0'`/`'false'`/`'off'`/`'no'`) skips it, a true spelling (`true`/`1`/`'1'`/`'on'`/`'yes'`) or an absent key uses the class's base name, any other non-empty string renames it. Any other value (`2`, `1.5`, an array) throws `InvalidConfigurationException`. |
 | `contributesToAbout(?Closure $data = null)` | Add a section to `php artisan about`. |
 | `publishesStubs(string $from, string $to, string $tag)` | Publish an arbitrary set of files under a custom tag. |
 

@@ -10,6 +10,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\ServiceProvider;
 use ReflectionClass;
 use RoundlyConsulting\PackageToolkit\Declarations\FacadeAliasDeclaration;
+use RoundlyConsulting\PackageToolkit\Exceptions\InvalidConfigurationException;
 use RoundlyConsulting\PackageToolkit\Support\Config;
 use RoundlyConsulting\PackageToolkit\Support\MigrationPublisher;
 use RoundlyConsulting\PackageToolkit\Support\ModelResolver;
@@ -80,12 +81,15 @@ abstract class PackageServiceProvider extends ServiceProvider
 
     /**
      * The alias name to register for a declaration, or `null` to skip it. The
-     * config value (when the declaration names one) decides: `null`, or anything
-     * {@see Config::boolean()} reads as false (`false`, `0`, `''`, `'0'`,
-     * `'false'`, `'off'`, `'no'`) skips aliasing; any other non-empty string
-     * renames the alias; `true` (or `'1'`, `'on'`, …), an absent key, or any
-     * unrecognized value falls back to the declared default (the facade's base
-     * name).
+     * config value (when the declaration names one) is read strictly, via
+     * {@see Config::strictBoolean()}: `null`, or a false spelling (`false`, `0`,
+     * `''`, `'0'`, `'false'`, `'off'`, `'no'`) skips aliasing; a true spelling
+     * (`true`, `1`, `'1'`, `'true'`, `'on'`, `'yes'`) or an absent key uses the
+     * declared default (the facade's base name); any other non-empty string
+     * renames the alias. Anything else (`2`, `1.5`, an array) throws
+     * {@see InvalidConfigurationException} instead of quietly aliasing.
+     *
+     * @throws InvalidConfigurationException
      */
     protected function resolveAliasName(FacadeAliasDeclaration $alias): ?string
     {
@@ -105,7 +109,7 @@ abstract class PackageServiceProvider extends ServiceProvider
             return $configured;
         }
 
-        return Config::boolean($alias->configKey, true) ? $alias->alias : null;
+        return Config::strictBoolean($alias->configKey, true) ? $alias->alias : null;
     }
 
     protected function bootPackage(): void
@@ -119,8 +123,9 @@ abstract class PackageServiceProvider extends ServiceProvider
         }
 
         foreach ($this->package->routes as $route) {
-            // Parsed, not compared: a host's `'off'` / `'0'` must switch the route off.
-            if ($route->enabledVia !== null && ! Config::boolean($route->enabledVia, true)) {
+            // Parsed strictly: `'off'` / `'0'` switch the route off, and a typo such as
+            // `'disabled'` throws rather than failing open by loading the routes.
+            if ($route->enabledVia !== null && ! Config::strictBoolean($route->enabledVia, true)) {
                 continue;
             }
 
