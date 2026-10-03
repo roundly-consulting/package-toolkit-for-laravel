@@ -130,11 +130,25 @@ describe('strictBoolean', function (): void {
         Config::strictBoolean('toolbox.b', true);
     })->with(['disabled', 'nope', 'ture', '2', ['x']])->throws(InvalidConfigurationException::class, 'must be a boolean');
 
+    it('names the key, the offending value and the accepted spellings', function (mixed $value, string $given): void {
+        config()->set('toolbox.b', $value);
+
+        expect(fn (): bool => Config::strictBoolean('toolbox.b', true))->toThrow(
+            InvalidConfigurationException::class,
+            "Configuration value [toolbox.b] must be a boolean (true/false, 1/0, on/off or yes/no), [{$given}] given.",
+        );
+    })->with([
+        'a string' => ['disabled', 'disabled'],
+        'an integer' => [-1, '-1'],
+        'a float' => [2.0, '2.0'],
+        'an array' => [['x'], 'array'],
+    ]);
+
     it('throws the nominated exception for a handed array', function (): void {
         expect(Config::for(['flag' => 'off'])->strictBoolean('flag', true))->toBeFalse();
 
         Config::for(['flag' => 'disabled'], CustomConfigException::class)->strictBoolean('flag');
-    })->throws(CustomConfigException::class, '[flag] must be a boolean');
+    })->throws(CustomConfigException::class, '[flag] must be a boolean (true/false, 1/0, on/off or yes/no), [disabled] given.');
 });
 
 describe('enum (strict)', function (): void {

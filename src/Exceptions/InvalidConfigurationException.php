@@ -22,9 +22,15 @@ final class InvalidConfigurationException extends PackageToolkitException
         return new self("Configuration value [{$key}] must be a non-empty string.");
     }
 
-    public static function notABoolean(string $key): self
+    public static function notABoolean(string $key, mixed $value): self
     {
-        return new self("Configuration value [{$key}] must be a boolean (true/false, 1/0, on/off or yes/no).");
+        $given = match (true) {
+            is_string($value) => $value,
+            is_int($value), is_float($value) => var_export($value, true),
+            default => get_debug_type($value),
+        };
+
+        return new self("Configuration value [{$key}] must be a boolean (true/false, 1/0, on/off or yes/no), [{$given}] given.");
     }
 
     public static function notAnInteger(string $key): self

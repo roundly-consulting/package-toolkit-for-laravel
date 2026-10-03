@@ -154,7 +154,8 @@ final class ConfigValidator
      * {@see self::boolean()}'s (`filter_var`: true/1/on/yes, false/0/off/no/'',
      * case-insensitive) — only a typo now fails loudly instead of silently reading
      * as the default. Use this — not `boolean()` — for a security-relevant switch,
-     * where `ALLOW_X=disabled` must never leave X on.
+     * where `ALLOW_X=disabled` must never leave X on. The message names the key,
+     * the offending value and the accepted spellings.
      */
     public function strictBoolean(string $key, bool $default = false): bool
     {
@@ -165,7 +166,7 @@ final class ConfigValidator
         }
 
         return filter_var($value, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE)
-            ?? throw $this->fail(InvalidConfigurationException::notABoolean($key));
+            ?? throw $this->fail(InvalidConfigurationException::notABoolean($key, $value));
     }
 
     /**
