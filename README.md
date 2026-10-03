@@ -32,8 +32,9 @@ database/config/model helpers — using only official Laravel and Symfony APIs.
   `polymorphicSubject()` schema macros.
 - **Database helpers** — a `DatabaseDriver` enum, an injection-safe
   `whereLikeEscaped()` search that works on every Laravel database driver,
-  config accessors (validate-or-throw, a strict enum accessor, lenient
-  fall-back variants, and an array-validating entry point), and a model
+  config accessors (validate-or-throw, strict enum and boolean accessors —
+  `strictBoolean()` throws on a typo instead of reading it as the default —
+  lenient fall-back variants, and an array-validating entry point), and a model
   resolver.
 
 ## Requirements
@@ -192,7 +193,7 @@ $type = KeyType::fromConfig('comments.key_type'); // KeyType::BigInt | KeyType::
 
 Schema::create('comments', function (Blueprint $table) use ($type): void {
     $table->id();
-    $table->ownerKey('author', $type);                 // FK column of the right type, indexed
+    $table->ownerKey('author_id', $type);              // FK column of the right type, indexed
     $table->morphKey('subject', $type);                // *_type / *_id morph pair (+ index)
     $table->polymorphicSubject('target', $type, true); // nullable morph pair
     $table->auditable();                               // timestamps() + softDeletes()
@@ -205,6 +206,11 @@ Schema::create('comments', function (Blueprint $table) use ($type): void {
 | `morphKey(string $name, KeyType $type, bool $nullable = false)` | The correct `morphs`/`uuidMorphs`/`ulidMorphs` (+ nullable variants) pair. |
 | `auditable()` | `timestamps()` + `softDeletes()`. |
 | `polymorphicSubject(string $name, KeyType $type, bool $nullable = false)` | A polymorphic subject column pair. |
+
+`ownerKey()` takes the **full column name**: `ownerKey('author', $type)` creates a
+column literally named `author`, not `author_id`. Pass `'author_id'` when that is
+the column you want. `morphKey()` and `polymorphicSubject()` are different: they
+take a prefix and append `_type` / `_id` themselves.
 
 ### Static analysis of the macros
 
@@ -303,6 +309,17 @@ final readonly class PasskeyConfig
 
 `Config::using(MyException::class)` gives the same nominated-exception validator
 while still reading the global repository, for config a package owns outright.
+
+Both validators have every reader the static accessors have — `intBetween()`,
+`requireString()`, `enum()`, `enumOr()`, `boolean()` and `strictBoolean()` — so a
+security-relevant switch in a handed array fails loudly too:
+
+```php
+$v = Config::for($config, PasskeyException::class);
+
+$v->strictBoolean('user_verification', true);   // absent → true; 'ture' throws PasskeyException
+Config::using(PasskeyException::class)->strictBoolean('passkeys.enabled', false);
+```
 
 There is also a `ResolvesModels` trait (convenience over `ModelResolver`) and a
 `HasRetryAfter` contract with a `ProvidesRetryAfter` trait for exceptions that
