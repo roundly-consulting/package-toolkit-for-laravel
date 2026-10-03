@@ -250,10 +250,12 @@ Comment::query()->whereLikeEscaped('body', $term);
 Config::intBetween('comments.per_page', 1, 100, 20);                   // '20' from env → 20; '--5' or '1.5' throws
 Config::requireString('comments.table');
 Config::enum('comments.hash_algo', HashAlgorithm::class);              // strict: throws on a typo
+Config::strictBoolean('comments.allow_guests', false);                 // boolean()'s words; 'ture' throws, absent → the default
 
 // Lenient accessors: fall back to the default, never throw.
 Config::enumOr('comments.key_type', KeyType::class, KeyType::BigInt);  // unknown value → KeyType::BigInt
 Config::boolean('comments.enabled', true);                             // '1'/'true'/'on'/'yes' → true; 'ture' → the default
+                                                                       // (use strictBoolean() for a security-relevant switch)
 
 // Resolve + validate a model class from config.
 $class = ModelResolver::for('comments.models.comment');       // class-string<Model>

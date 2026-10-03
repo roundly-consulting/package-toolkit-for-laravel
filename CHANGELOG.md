@@ -22,7 +22,8 @@ Initial public release.
   `auditable()` and `polymorphicSubject()` Blueprint macros.
 - An injection-safe `whereLikeEscaped()` query macro that works on every Laravel database
   driver, and a `DatabaseDriver` enum.
-- Validate-or-throw config accessors (`Config::intBetween()`, `requireString()`, `enum()`) and
+- Validate-or-throw config accessors (`Config::intBetween()`, `requireString()`, `enum()`,
+  `strictBoolean()` — `boolean()`'s vocabulary, but a typo throws instead of reading as the default) and
   lenient fall-back ones (`enumOr()`, `boolean()`), coercing env strings to the expected type,
   including `Config::for()` to validate a DTO's input array with your own exception class.
 - `ModelResolver` to resolve and validate model classes named in config.

@@ -149,6 +149,26 @@ final class ConfigValidator
     }
 
     /**
+     * A strict boolean value: falls back to `$default` only when absent (null),
+     * and THROWS when present but unparseable. The vocabulary is exactly
+     * {@see self::boolean()}'s (`filter_var`: true/1/on/yes, false/0/off/no/'',
+     * case-insensitive) — only a typo now fails loudly instead of silently reading
+     * as the default. Use this — not `boolean()` — for a security-relevant switch,
+     * where `ALLOW_X=disabled` must never leave X on.
+     */
+    public function strictBoolean(string $key, bool $default = false): bool
+    {
+        $value = $this->read($key);
+
+        if ($value === null) {
+            return $default;
+        }
+
+        return filter_var($value, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE)
+            ?? throw $this->fail(InvalidConfigurationException::notABoolean($key));
+    }
+
+    /**
      * The case of `$enum` a raw config value names, or null when it names none.
      *
      * `tryFrom()` is typed on the enum's backing type, so under `strict_types` a

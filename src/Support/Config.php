@@ -82,6 +82,18 @@ final class Config
     }
 
     /**
+     * A strict boolean config value: falls back to `$default` only when the key
+     * is absent, and throws when present but unparseable (the vocabulary is
+     * {@see self::boolean()}'s). Use this — not `boolean()` — for a
+     * security-relevant switch, so an env typo fails loudly instead of silently
+     * reading as the default.
+     */
+    public static function strictBoolean(string $key, bool $default = false): bool
+    {
+        return ConfigValidator::forRepository()->strictBoolean($key, $default);
+    }
+
+    /**
      * Validate the values inside an array you were handed (e.g. the payload a
      * DTO's `fromArray()` received), rather than reading the global repository
      * behind the caller's back. Optionally nominate the exception class thrown

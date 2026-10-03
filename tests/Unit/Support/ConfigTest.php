@@ -101,6 +101,42 @@ describe('boolean', function (): void {
     });
 });
 
+describe('strictBoolean', function (): void {
+    it('parses the same vocabulary as boolean()', function (mixed $value, bool $expected): void {
+        config()->set('toolbox.b', $value);
+
+        expect(Config::strictBoolean('toolbox.b'))->toBe($expected)
+            ->and(Config::boolean('toolbox.b', ! $expected))->toBe($expected);
+    })->with([
+        [true, true], [false, false], [1, true], [0, false],
+        ['true', true], ['TRUE', true], ['1', true], ['on', true], ['yes', true],
+        ['false', false], ['0', false], ['off', false], ['no', false], ['', false],
+    ]);
+
+    it('falls back to the default only when the key is absent', function (): void {
+        config()->set('toolbox.b', null);
+
+        expect(Config::strictBoolean('toolbox.b', true))->toBeTrue()
+            ->and(Config::strictBoolean('toolbox.b'))->toBeFalse();
+    });
+
+    it('THROWS on a typo where boolean() would silently fall back', function (mixed $value): void {
+        config()->set('toolbox.b', $value);
+
+        // boolean() is lenient — the typo reads as the default without a peep.
+        expect(Config::boolean('toolbox.b', true))->toBeTrue();
+
+        // strictBoolean() fails loudly.
+        Config::strictBoolean('toolbox.b', true);
+    })->with(['disabled', 'nope', 'ture', '2', ['x']])->throws(InvalidConfigurationException::class, 'must be a boolean');
+
+    it('throws the nominated exception for a handed array', function (): void {
+        expect(Config::for(['flag' => 'off'])->strictBoolean('flag', true))->toBeFalse();
+
+        Config::for(['flag' => 'disabled'], CustomConfigException::class)->strictBoolean('flag');
+    })->throws(CustomConfigException::class, '[flag] must be a boolean');
+});
+
 describe('enum (strict)', function (): void {
     it('maps a recognized value', function (): void {
         config()->set('toolbox.kt', 'uuid');
