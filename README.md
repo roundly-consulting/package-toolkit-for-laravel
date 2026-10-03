@@ -32,10 +32,10 @@ database/config/model helpers — using only official Laravel and Symfony APIs.
   `polymorphicSubject()` schema macros.
 - **Database helpers** — a `DatabaseDriver` enum, an injection-safe
   `whereLikeEscaped()` search that works on every Laravel database driver,
-  config accessors (validate-or-throw, strict enum and boolean accessors —
-  `strictBoolean()` throws on a typo instead of reading it as the default —
-  lenient fall-back variants, and an array-validating entry point), and a model
-  resolver.
+  config accessors (validate-or-throw integer, string, enum and boolean
+  readers — `boolean()` throws on a typo such as `'disabled'` instead of reading
+  it as the default — a lenient `enumOr()`, and an array-validating entry
+  point), and a model resolver.
 
 ## Requirements
 
@@ -89,7 +89,7 @@ for a non-standard layout.
 | `hasMigration(string $name)` | Publish a single `database/migrations/<name>.php.stub` under `<name>-migrations`, timestamp-injected. Use only for a `.php.stub` source; `.php` files are picked up by `hasMigrations()`. |
 | `hasTranslations()` | Load + publish translations (published to `lang/vendor/<name>`, tag `<name>-translations`). |
 | `hasViews(?string $namespace = null)` | Register + publish Blade views (namespace defaults to `<name>`, tag `<name>-views`). |
-| `hasRoutes(string $file, ?string $enabledVia = null)` | Load a route file (optionally gated behind a boolean config key) and publish it under `<name>-routes`. The switch is read strictly, like `Config::strictBoolean()`: `false`/`0`/`'off'`/`'no'`/`'false'`/`''` skip the file; `true`/`1`/`'on'`/`'yes'`/`'true'`, an absent key or `null` load it; anything else (`'disabled'`, `'ture'`, `2`) throws `InvalidConfigurationException` at boot, so a typo never loads the routes. |
+| `hasRoutes(string $file, ?string $enabledVia = null)` | Load a route file (optionally gated behind a boolean config key) and publish it under `<name>-routes`. The switch is read like `Config::boolean()`: `false`/`0`/`'off'`/`'no'`/`'false'`/`''` skip the file; `true`/`1`/`'on'`/`'yes'`/`'true'`, an absent key or `null` load it; anything else (`'disabled'`, `'ture'`, `2`) throws `InvalidConfigurationException` at boot, so a typo never loads the routes. |
 | `hasCommands(array $commands)` | Register console commands (console only). |
 | `hasFacadeAlias(string $class, ?string $configKey = null)` | Register a class alias. The config value decides: `null` or a false spelling (`false`/`0`/`''`/`'0'`/`'false'`/`'off'`/`'no'`) skips it, a true spelling (`true`/`1`/`'1'`/`'on'`/`'yes'`) or an absent key uses the class's base name, any other non-empty string renames it. Any other value (`2`, `1.5`, an array) throws `InvalidConfigurationException`. |
 | `contributesToAbout(?Closure $data = null)` | Add a section to `php artisan about`. |
@@ -256,12 +256,10 @@ Comment::query()->whereLikeEscaped('body', $term);
 Config::intBetween('comments.per_page', 1, 100, 20);                   // '20' from env → 20; '--5' or '1.5' throws
 Config::requireString('comments.table');
 Config::enum('comments.hash_algo', HashAlgorithm::class);              // strict: throws on a typo
-Config::strictBoolean('comments.allow_guests', false);                 // boolean()'s words; 'ture' throws, absent → the default
+Config::boolean('comments.allow_guests', false);                       // '1'/'true'/'on'/'yes' → true; 'ture' throws; absent/null → the default
 
-// Lenient accessors: fall back to the default, never throw.
+// Lenient accessor: falls back to the default, never throws.
 Config::enumOr('comments.key_type', KeyType::class, KeyType::BigInt);  // unknown value → KeyType::BigInt
-Config::boolean('comments.enabled', true);                             // '1'/'true'/'on'/'yes' → true; 'ture' → the default
-                                                                       // (use strictBoolean() for a security-relevant switch)
 
 // Resolve + validate a model class from config.
 $class = ModelResolver::for('comments.models.comment');       // class-string<Model>
@@ -311,14 +309,14 @@ final readonly class PasskeyConfig
 while still reading the global repository, for config a package owns outright.
 
 Both validators have every reader the static accessors have — `intBetween()`,
-`requireString()`, `enum()`, `enumOr()`, `boolean()` and `strictBoolean()` — so a
-security-relevant switch in a handed array fails loudly too:
+`requireString()`, `enum()`, `enumOr()` and `boolean()` — so a switch in a
+handed array fails loudly too:
 
 ```php
 $v = Config::for($config, PasskeyException::class);
 
-$v->strictBoolean('user_verification', true);   // absent → true; 'ture' throws PasskeyException
-Config::using(PasskeyException::class)->strictBoolean('passkeys.enabled', false);
+$v->boolean('user_verification', true);   // absent → true; 'ture' throws PasskeyException
+Config::using(PasskeyException::class)->boolean('passkeys.enabled', false);
 ```
 
 There is also a `ResolvesModels` trait (convenience over `ModelResolver`) and a

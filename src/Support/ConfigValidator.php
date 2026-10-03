@@ -134,30 +134,14 @@ final class ConfigValidator
     }
 
     /**
-     * A boolean value coerced via `filter_var`, falling back to `$default` for a
-     * missing or unparseable value.
+     * A boolean value: falls back to `$default` only when absent (null), and
+     * THROWS when present but unparseable. The vocabulary is PHP's `filter_var`
+     * boolean: `true`/`1`/`on`/`yes` and `false`/`0`/`off`/`no`/`''`,
+     * case-insensitive and trimmed. A typo such as `ALLOW_X=disabled` therefore
+     * fails loudly instead of silently reading as the default; the message names
+     * the key, the offending value and the accepted spellings.
      */
     public function boolean(string $key, bool $default = false): bool
-    {
-        $value = $this->read($key);
-
-        if ($value === null) {
-            return $default;
-        }
-
-        return filter_var($value, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE) ?? $default;
-    }
-
-    /**
-     * A strict boolean value: falls back to `$default` only when absent (null),
-     * and THROWS when present but unparseable. The vocabulary is exactly
-     * {@see self::boolean()}'s (`filter_var`: true/1/on/yes, false/0/off/no/'',
-     * case-insensitive) — only a typo now fails loudly instead of silently reading
-     * as the default. Use this — not `boolean()` — for a security-relevant switch,
-     * where `ALLOW_X=disabled` must never leave X on. The message names the key,
-     * the offending value and the accepted spellings.
-     */
-    public function strictBoolean(string $key, bool $default = false): bool
     {
         $value = $this->read($key);
 

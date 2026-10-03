@@ -73,24 +73,15 @@ final class Config
     }
 
     /**
-     * A boolean config value coerced via `filter_var`, falling back to
-     * `$default` for a missing or unparseable value.
+     * A boolean config value: falls back to `$default` only when the key is
+     * absent (null), and throws when present but unparseable. The vocabulary is
+     * `filter_var`'s: `true`/`1`/`on`/`yes` and `false`/`0`/`off`/`no`/`''`,
+     * case-insensitive, so an env typo such as `disabled` fails loudly instead
+     * of silently reading as the default.
      */
     public static function boolean(string $key, bool $default = false): bool
     {
         return ConfigValidator::forRepository()->boolean($key, $default);
-    }
-
-    /**
-     * A strict boolean config value: falls back to `$default` only when the key
-     * is absent, and throws when present but unparseable (the vocabulary is
-     * {@see self::boolean()}'s). Use this — not `boolean()` — for a
-     * security-relevant switch, so an env typo fails loudly instead of silently
-     * reading as the default.
-     */
-    public static function strictBoolean(string $key, bool $default = false): bool
-    {
-        return ConfigValidator::forRepository()->strictBoolean($key, $default);
     }
 
     /**

@@ -145,7 +145,7 @@ final class Package
     /**
      * Load a route file (optionally gated behind a boolean config key) and
      * publish it under the `<name>-routes` tag. The switch is read strictly at
-     * boot, via {@see Config::strictBoolean()} with a `true` default: `false`,
+     * boot, via {@see Config::boolean()} with a `true` default: `false`,
      * `0`, `''`, `'0'`, `'false'`, `'off'` and `'no'` skip the file; `true`, `1`,
      * `'1'`, `'true'`, `'on'`, `'yes'`, an absent key or `null` load it; anything
      * else (`'disabled'`, `'ture'`, `2`) throws
@@ -176,7 +176,7 @@ final class Package
 
     /**
      * Register a class alias, optionally driven by a config key. The config
-     * value is read strictly at register time, via {@see Config::strictBoolean()}:
+     * value is read strictly at register time, via {@see Config::boolean()}:
      * `null` or a false spelling (`false`, `0`, `''`, `'0'`, `'false'`, `'off'`,
      * `'no'`) skips the alias entirely; a true spelling (`true`, `1`, `'1'`,
      * `'true'`, `'on'`, `'yes'`) or an absent key uses the class's base name; any

@@ -84,56 +84,37 @@ describe('enumOr', function (): void {
 });
 
 describe('boolean', function (): void {
-    it('parses truthy and falsy values', function (): void {
-        config()->set('toolbox.b', 'true');
-        expect(Config::boolean('toolbox.b'))->toBeTrue();
-
-        config()->set('toolbox.b', '0');
-        expect(Config::boolean('toolbox.b'))->toBeFalse();
-    });
-
-    it('falls back to the default', function (): void {
-        config()->set('toolbox.b', null);
-        expect(Config::boolean('toolbox.b', true))->toBeTrue();
-
-        config()->set('toolbox.b', 'not-a-bool');
-        expect(Config::boolean('toolbox.b', true))->toBeTrue();
-    });
-});
-
-describe('strictBoolean', function (): void {
-    it('parses the same vocabulary as boolean()', function (mixed $value, bool $expected): void {
+    it('parses the env-style vocabulary', function (mixed $value, bool $expected): void {
         config()->set('toolbox.b', $value);
 
-        expect(Config::strictBoolean('toolbox.b'))->toBe($expected)
-            ->and(Config::boolean('toolbox.b', ! $expected))->toBe($expected);
+        expect(Config::boolean('toolbox.b', ! $expected))->toBe($expected);
     })->with([
-        [true, true], [false, false], [1, true], [0, false],
-        ['true', true], ['TRUE', true], ['1', true], ['on', true], ['yes', true],
-        ['false', false], ['0', false], ['off', false], ['no', false], ['', false],
+        [true, true], [false, false], [1, true], [0, false], [1.0, true], [0.0, false],
+        ['true', true], ['TRUE', true], ['1', true], ['on', true], ['yes', true], [' Yes ', true], ["true\n", true],
+        ['false', false], ['0', false], ['off', false], ['no', false], ['', false], ['   ', false], ['OFF', false],
     ]);
 
-    it('falls back to the default only when the key is absent', function (): void {
+    it('falls back to the default only when the key is absent or null', function (): void {
         config()->set('toolbox.b', null);
 
-        expect(Config::strictBoolean('toolbox.b', true))->toBeTrue()
-            ->and(Config::strictBoolean('toolbox.b'))->toBeFalse();
+        expect(Config::boolean('toolbox.b', true))->toBeTrue()
+            ->and(Config::boolean('toolbox.b'))->toBeFalse()
+            ->and(Config::boolean('toolbox.never_set', true))->toBeTrue()
+            ->and(Config::for([])->boolean('flag', true))->toBeTrue()
+            ->and(Config::for(['flag' => null])->boolean('flag', true))->toBeTrue();
     });
 
-    it('THROWS on a typo where boolean() would silently fall back', function (mixed $value): void {
+    it('THROWS on a present but unparseable value instead of reading the default', function (mixed $value): void {
         config()->set('toolbox.b', $value);
 
-        // boolean() is lenient — the typo reads as the default without a peep.
-        expect(Config::boolean('toolbox.b', true))->toBeTrue();
-
-        // strictBoolean() fails loudly.
-        Config::strictBoolean('toolbox.b', true);
-    })->with(['disabled', 'nope', 'ture', '2', ['x']])->throws(InvalidConfigurationException::class, 'must be a boolean');
+        Config::boolean('toolbox.b', true);
+    })->with(['disabled', 'enabled', 'nope', 'ture', 'y', 'n', '2', 2, -1, 1.5, ['x']])
+        ->throws(InvalidConfigurationException::class, 'must be a boolean');
 
     it('names the key, the offending value and the accepted spellings', function (mixed $value, string $given): void {
         config()->set('toolbox.b', $value);
 
-        expect(fn (): bool => Config::strictBoolean('toolbox.b', true))->toThrow(
+        expect(fn (): bool => Config::boolean('toolbox.b', true))->toThrow(
             InvalidConfigurationException::class,
             "Configuration value [toolbox.b] must be a boolean (true/false, 1/0, on/off or yes/no), [{$given}] given.",
         );
@@ -145,10 +126,21 @@ describe('strictBoolean', function (): void {
     ]);
 
     it('throws the nominated exception for a handed array', function (): void {
-        expect(Config::for(['flag' => 'off'])->strictBoolean('flag', true))->toBeFalse();
+        expect(Config::for(['flag' => 'off'])->boolean('flag', true))->toBeFalse();
 
-        Config::for(['flag' => 'disabled'], CustomConfigException::class)->strictBoolean('flag');
+        Config::for(['flag' => 'disabled'], CustomConfigException::class)->boolean('flag');
     })->throws(CustomConfigException::class, '[flag] must be a boolean (true/false, 1/0, on/off or yes/no), [disabled] given.');
+
+    it('throws the nominated exception for a repository read', function (): void {
+        config()->set('passkeys.enabled', 'maybe');
+
+        Config::using(CustomConfigException::class)->boolean('passkeys.enabled', true);
+    })->throws(CustomConfigException::class, '[passkeys.enabled] must be a boolean');
+
+    it('has a single boolean reader, with no separate strict twin', function (): void {
+        expect(method_exists(Config::class, 'strictBoolean'))->toBeFalse()
+            ->and(method_exists(RoundlyConsulting\PackageToolkit\Support\ConfigValidator::class, 'strictBoolean'))->toBeFalse();
+    });
 });
 
 describe('enum (strict)', function (): void {

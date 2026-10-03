@@ -82,7 +82,7 @@ abstract class PackageServiceProvider extends ServiceProvider
     /**
      * The alias name to register for a declaration, or `null` to skip it. The
      * config value (when the declaration names one) is read strictly, via
-     * {@see Config::strictBoolean()}: `null`, or a false spelling (`false`, `0`,
+     * {@see Config::boolean()}: `null`, or a false spelling (`false`, `0`,
      * `''`, `'0'`, `'false'`, `'off'`, `'no'`) skips aliasing; a true spelling
      * (`true`, `1`, `'1'`, `'true'`, `'on'`, `'yes'`) or an absent key uses the
      * declared default (the facade's base name); any other non-empty string
@@ -109,7 +109,7 @@ abstract class PackageServiceProvider extends ServiceProvider
             return $configured;
         }
 
-        return Config::strictBoolean($alias->configKey, true) ? $alias->alias : null;
+        return Config::boolean($alias->configKey, true) ? $alias->alias : null;
     }
 
     protected function bootPackage(): void
@@ -125,7 +125,7 @@ abstract class PackageServiceProvider extends ServiceProvider
         foreach ($this->package->routes as $route) {
             // Parsed strictly: `'off'` / `'0'` switch the route off, and a typo such as
             // `'disabled'` throws rather than failing open by loading the routes.
-            if ($route->enabledVia !== null && ! Config::strictBoolean($route->enabledVia, true)) {
+            if ($route->enabledVia !== null && ! Config::boolean($route->enabledVia, true)) {
                 continue;
             }
 
