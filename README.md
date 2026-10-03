@@ -138,7 +138,9 @@ public function register(): void
 {
     parent::register();
 
-    // Bind a contract to the class named in config, with a default.
+    // Bind a contract to the class named in config, with a default. Absent/null → the
+    // default; a value that isn't an existing class implementing the contract (false, '',
+    // a typo'd class name) throws InvalidConfigurationException when the contract resolves.
     $this->bindFromConfig(CommentRepository::class, 'comments.repository', EloquentCommentRepository::class);
 }
 
@@ -183,13 +185,15 @@ final class CommentsServiceProvider extends PackageServiceProvider
 
 Register the macros with `RegistersBlueprintMacros` (see above), then use them
 in migrations. `KeyType` resolves the host's chosen key strategy from config —
-a `KeyType` case or its (case-insensitive) string value — falling back
-**silently** to `bigint` for any unrecognized value:
+a `KeyType` case or its (case-insensitive, trimmed) string value. An absent or
+null key reads as the default (`bigint`); any other value, such as a typo'd
+`'uiid'`, throws `InvalidConfigurationException` instead of silently building
+bigint columns:
 
 ```php
 use RoundlyConsulting\PackageToolkit\Enums\KeyType;
 
-$type = KeyType::fromConfig('comments.key_type'); // KeyType::BigInt | KeyType::Uuid | KeyType::Ulid
+$type = KeyType::fromConfig('comments.key_type'); // KeyType::BigInt | KeyType::Uuid | KeyType::Ulid; 'uiid' throws
 
 Schema::create('comments', function (Blueprint $table) use ($type): void {
     $table->id();

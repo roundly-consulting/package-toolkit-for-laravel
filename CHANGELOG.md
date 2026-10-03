@@ -17,10 +17,11 @@ Initial public release.
   instead of leaving the feature on.
 - Publish-only migrations, timestamp-injected in directory order and republished in place —
   never over a same-named migration the package did not publish.
-- Register-time helpers `bindFromConfig()` and `observesModel()`, plus the idempotent
+- Register-time helpers `bindFromConfig()` (a configured class that is missing or not the
+  contract throws) and `observesModel()`, plus the idempotent
   `InteractsWithGates`, `RegistersBladeDirectives` and `RegistersBlueprintMacros` traits.
-- A config-driven `KeyType` (`bigint` / `uuid` / `ulid`) with the `ownerKey()`, `morphKey()`,
-  `auditable()` and `polymorphicSubject()` Blueprint macros.
+- A config-driven `KeyType` (`bigint` / `uuid` / `ulid`; an unrecognized value throws) with the
+  `ownerKey()`, `morphKey()`, `auditable()` and `polymorphicSubject()` Blueprint macros.
 - An injection-safe `whereLikeEscaped()` query macro that works on every Laravel database
   driver, and a `DatabaseDriver` enum.
 - Validate-or-throw config accessors (`Config::intBetween()`, `requireString()`, `enum()`,

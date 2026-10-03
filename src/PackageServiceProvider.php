@@ -232,18 +232,30 @@ abstract class PackageServiceProvider extends ServiceProvider
     }
 
     /**
-     * Bind a contract to the implementation named by a config key, defaulting to
-     * `$default` when the key is unset. Call from an overridden `register()`.
+     * Bind a contract to the implementation named by a config key. Call from an
+     * overridden `register()`. Config is read when the contract is resolved: an
+     * absent or null value binds `$default`; any other value must name an
+     * existing class that is a `$contract`, or resolving THROWS
+     * {@see InvalidConfigurationException} (so `false`, `''`, a missing class, a
+     * class of the wrong type, or the contract itself never resolve silently).
      *
      * @param  class-string  $contract
      * @param  class-string  $default
      */
     protected function bindFromConfig(string $contract, string $configKey, string $default): void
     {
-        $this->app->bind($contract, function () use ($configKey, $default) {
-            $concrete = config($configKey, $default);
+        $this->app->bind($contract, function () use ($contract, $configKey, $default): mixed {
+            $configured = config($configKey);
 
-            return $this->app->make(is_string($concrete) ? $concrete : $default);
+            if ($configured === null) {
+                return $this->app->make($default);
+            }
+
+            if (! is_string($configured) || ! class_exists($configured) || ! is_a($configured, $contract, true)) {
+                throw InvalidConfigurationException::notAnImplementation($configKey, $contract, $configured);
+            }
+
+            return $this->app->make($configured);
         });
     }
 
