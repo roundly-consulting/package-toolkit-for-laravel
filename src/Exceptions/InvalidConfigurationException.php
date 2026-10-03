@@ -5,11 +5,16 @@ declare(strict_types=1);
 namespace RoundlyConsulting\PackageToolkit\Exceptions;
 
 use BackedEnum;
+use Illuminate\Database\Eloquent\Model;
 use RoundlyConsulting\PackageToolkit\Enums\KeyType;
 
 /**
  * Thrown when a package reads a configuration value that is missing, of the
  * wrong type, out of range, or otherwise unusable.
+ *
+ * Every "wrong value" message has one shape — `Configuration value [key] must
+ * be …, [given] given.` — where `given` is the offending value as written (`''`
+ * when empty), a scalar as its PHP literal, or anything else by its type.
  */
 final class InvalidConfigurationException extends PackageToolkitException
 {
@@ -18,24 +23,21 @@ final class InvalidConfigurationException extends PackageToolkitException
         return new self("Configuration value [{$key}] is required but missing.");
     }
 
-    public static function notAString(string $key): self
+    public static function notAString(string $key, mixed $value): self
     {
-        return new self("Configuration value [{$key}] must be a non-empty string.");
+        return self::mustBe($key, 'a non-empty string', $value);
     }
 
     public static function notABoolean(string $key, mixed $value): self
     {
-        $given = self::describe($value);
-
-        return new self("Configuration value [{$key}] must be a boolean (true/false, 1/0, on/off or yes/no), [{$given}] given.");
+        return self::mustBe($key, 'a boolean (true/false, 1/0, on/off or yes/no)', $value);
     }
 
     public static function notAKeyType(string $key, mixed $value): self
     {
-        $allowed = implode(', ', array_map(static fn (KeyType $type): string => $type->value, KeyType::cases()));
-        $given = self::describe($value);
+        $allowed = array_map(static fn (KeyType $type): string => $type->value, KeyType::cases());
 
-        return new self("Configuration value [{$key}] must be one of [{$allowed}] (case-insensitive), [{$given}] given.");
+        return self::mustBe($key, 'one of ['.implode(', ', $allowed).'] (case-insensitive)', $value);
     }
 
     /**
@@ -43,44 +45,59 @@ final class InvalidConfigurationException extends PackageToolkitException
      */
     public static function notAnImplementation(string $key, string $contract, mixed $value): self
     {
-        $given = self::describe($value);
-
-        return new self("Configuration value [{$key}] must be a class-string of [{$contract}], [{$given}] given.");
+        return self::mustBe($key, "a class-string of [{$contract}]", $value);
     }
 
-    public static function notAnInteger(string $key): self
+    public static function notAnInteger(string $key, mixed $value): self
     {
-        return new self("Configuration value [{$key}] must be an integer.");
+        return self::mustBe($key, 'an integer', $value);
     }
 
-    public static function outOfRange(string $key, int $min, int $max): self
+    public static function outOfRange(string $key, ?int $min, ?int $max, mixed $value): self
     {
-        return new self("Configuration value [{$key}] must be between {$min} and {$max}.");
+        $bound = match (true) {
+            $min !== null && $max !== null => "between {$min} and {$max}",
+            $min !== null => "at least {$min}",
+            default => "at most {$max}",
+        };
+
+        return self::mustBe($key, $bound, $value);
     }
 
     /**
      * @param  class-string<BackedEnum>  $enum
      */
-    public static function notAValidEnum(string $key, string $enum): self
+    public static function notAValidEnum(string $key, string $enum, mixed $value): self
     {
-        $allowed = implode(', ', array_map(
-            static fn (BackedEnum $case): string => (string) $case->value,
-            $enum::cases(),
-        ));
+        $allowed = array_map(static fn (BackedEnum $case): string => (string) $case->value, $enum::cases());
 
-        return new self("Configuration value [{$key}] must be one of [{$allowed}].");
+        return self::notOneOf($key, $allowed, $value);
     }
 
-    public static function notAModel(string $key, mixed $value): self
+    /**
+     * @param  array<array-key, string>  $allowed
+     */
+    public static function notOneOf(string $key, array $allowed, mixed $value): self
     {
-        $given = is_string($value) ? $value : get_debug_type($value);
+        return self::mustBe($key, 'one of ['.implode(', ', $allowed).']', $value);
+    }
 
-        return new self("Configuration value [{$key}] must be a class-string of an Eloquent model, [{$given}] given.");
+    /**
+     * @param  class-string  $base
+     */
+    public static function notAModel(string $key, mixed $value, string $base = Model::class): self
+    {
+        return self::mustBe($key, "a class-string of [{$base}]", $value);
     }
 
     public static function unsupportedDatabaseDriver(string $driver): self
     {
         return new self("Unsupported database driver [{$driver}].");
+    }
+
+    private static function mustBe(string $key, string $expectation, mixed $value): self
+    {
+        return new self("Configuration value [{$key}] must be {$expectation}, [".self::describe($value).'] given.');
     }
 
     /**

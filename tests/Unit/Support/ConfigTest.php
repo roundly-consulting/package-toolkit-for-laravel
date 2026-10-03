@@ -5,40 +5,85 @@ declare(strict_types=1);
 use RoundlyConsulting\PackageToolkit\Enums\KeyType;
 use RoundlyConsulting\PackageToolkit\Exceptions\InvalidConfigurationException;
 use RoundlyConsulting\PackageToolkit\Support\Config;
+use RoundlyConsulting\PackageToolkit\Support\ConfigValidator;
 use RoundlyConsulting\PackageToolkit\Tests\Fixtures\CustomConfigException;
 use RoundlyConsulting\PackageToolkit\Tests\Fixtures\Priority;
 use RoundlyConsulting\PackageToolkit\Tests\Fixtures\Version;
 
-describe('intBetween', function (): void {
-    it('returns an in-range value', function (): void {
-        config()->set('toolbox.n', 5);
+describe('integer', function (): void {
+    it('reads an int or a canonical integer string', function (mixed $value, int $expected): void {
+        config()->set('toolbox.n', $value);
 
-        expect(Config::intBetween('toolbox.n', 1, 10, 3))->toBe(5);
-    });
+        expect(Config::integer('toolbox.n', 3))->toBe($expected);
+    })->with([
+        [5, 5], [0, 0], [-5, -5], ['30', 30], ['-5', -5], [' 30 ', 30], ["30\n", 30], ['007', 7], ['-0', 0],
+    ]);
 
-    it('coerces a numeric string', function (): void {
-        config()->set('toolbox.n', '7');
-
-        expect(Config::intBetween('toolbox.n', 1, 10, 3))->toBe(7);
-    });
-
-    it('falls back to the default when missing', function (): void {
+    it('falls back to the default only when the key is absent or null', function (): void {
         config()->set('toolbox.n', null);
 
-        expect(Config::intBetween('toolbox.n', 1, 10, 3))->toBe(3);
+        expect(Config::integer('toolbox.n', 3))->toBe(3)
+            ->and(Config::integer('toolbox.never_set', 9))->toBe(9)
+            ->and(Config::for([])->integer('timeout', 60, min: 1, max: 300))->toBe(60);
     });
 
-    it('throws when not an integer', function (): void {
-        config()->set('toolbox.n', 'abc');
+    it('THROWS on anything but an integer instead of reading the default', function (mixed $value, string $given): void {
+        config()->set('toolbox.n', $value);
 
-        Config::intBetween('toolbox.n', 1, 10, 3);
-    })->throws(InvalidConfigurationException::class);
+        expect(fn (): int => Config::integer('toolbox.n', 3))->toThrow(
+            InvalidConfigurationException::class,
+            "Configuration value [toolbox.n] must be an integer, [{$given}] given.",
+        );
+    })->with([
+        'a word' => ['five', 'five'],
+        'a decimal string' => ['5.5', '5.5'],
+        'trailing junk' => ['5abc', '5abc'],
+        'an empty string' => ['', "''"],
+        'blank' => ['  ', '  '],
+        'an exponent' => ['1e3', '1e3'],
+        'hex' => ['0x10', '0x10'],
+        'an explicit plus' => ['+5', '+5'],
+        'a double minus' => ['--5', '--5'],
+        'a lone minus' => ['-', '-'],
+        'a trailing minus' => ['5-', '5-'],
+        'an inner space' => ['1 000', '1 000'],
+        'an overflow' => ['99999999999999999999', '99999999999999999999'],
+        'a float' => [5.0, '5.0'],
+        'true' => [true, 'true'],
+        'false' => [false, 'false'],
+        'an array' => [[5], 'array'],
+    ]);
 
-    it('throws when out of range', function (): void {
-        config()->set('toolbox.n', 99);
+    it('range-checks the value, naming the bound and the value', function (mixed $value, ?int $min, ?int $max, string $message): void {
+        config()->set('toolbox.n', $value);
 
-        Config::intBetween('toolbox.n', 1, 10, 3);
-    })->throws(InvalidConfigurationException::class, 'between 1 and 10');
+        expect(fn (): int => Config::integer('toolbox.n', 3, $min, $max))->toThrow(
+            InvalidConfigurationException::class,
+            "Configuration value [toolbox.n] {$message}",
+        );
+    })->with([
+        'above a closed range' => [99, 1, 10, 'must be between 1 and 10, [99] given.'],
+        'below a closed range' => ['0', 1, 10, 'must be between 1 and 10, [0] given.'],
+        'below a floor' => [-1, 0, null, 'must be at least 0, [-1] given.'],
+        'above a ceiling' => ['500', null, 100, 'must be at most 100, [500] given.'],
+    ]);
+
+    it('accepts the bounds themselves', function (): void {
+        config()->set('toolbox.n', '10');
+
+        expect(Config::integer('toolbox.n', 3, min: 1, max: 10))->toBe(10)
+            ->and(Config::integer('toolbox.n', 3, min: 10))->toBe(10)
+            ->and(Config::integer('toolbox.n', 3, max: 10))->toBe(10);
+    });
+
+    it('range-checks the default too', function (): void {
+        Config::integer('toolbox.never_set', 0, min: 1, max: 10);
+    })->throws(InvalidConfigurationException::class, 'Configuration value [toolbox.never_set] must be between 1 and 10, [0] given.');
+
+    it('has a single strict integer reader', function (): void {
+        expect(method_exists(Config::class, 'intBetween'))->toBeFalse()
+            ->and(method_exists(ConfigValidator::class, 'intBetween'))->toBeFalse();
+    });
 });
 
 describe('requireString', function (): void {
@@ -52,35 +97,106 @@ describe('requireString', function (): void {
         config()->set('toolbox.s', null);
 
         Config::requireString('toolbox.s');
-    })->throws(InvalidConfigurationException::class, 'required but missing');
+    })->throws(InvalidConfigurationException::class, 'Configuration value [toolbox.s] is required but missing.');
 
-    it('throws when blank or of the wrong type', function (): void {
-        config()->set('toolbox.s', '   ');
+    it('throws when blank or of the wrong type, naming the value', function (mixed $value, string $given): void {
+        config()->set('toolbox.s', $value);
 
-        Config::requireString('toolbox.s');
-    })->throws(InvalidConfigurationException::class, 'non-empty string');
+        expect(fn (): string => Config::requireString('toolbox.s'))->toThrow(
+            InvalidConfigurationException::class,
+            "Configuration value [toolbox.s] must be a non-empty string, [{$given}] given.",
+        );
+    })->with([
+        'blank' => ['   ', '   '],
+        'empty' => ['', "''"],
+        'an integer' => [5, '5'],
+        'false' => [false, 'false'],
+        'an array' => [['x'], 'array'],
+    ]);
 });
 
-describe('enumOr', function (): void {
-    it('maps a backing value', function (): void {
+describe('enum', function (): void {
+    it('maps a backing value or passes an instance through', function (): void {
         config()->set('toolbox.kt', 'uuid');
+        expect(Config::enum('toolbox.kt', KeyType::class))->toBe(KeyType::Uuid);
 
-        expect(Config::enumOr('toolbox.kt', KeyType::class, KeyType::BigInt))->toBe(KeyType::Uuid);
-    });
-
-    it('passes through an enum instance', function (): void {
         config()->set('toolbox.kt', KeyType::Ulid);
-
-        expect(Config::enumOr('toolbox.kt', KeyType::class, KeyType::BigInt))->toBe(KeyType::Ulid);
+        expect(Config::enum('toolbox.kt', KeyType::class, KeyType::BigInt))->toBe(KeyType::Ulid);
     });
 
-    it('falls back for an unknown or missing value', function (): void {
-        config()->set('toolbox.kt', 'nope');
-        expect(Config::enumOr('toolbox.kt', KeyType::class, KeyType::BigInt))->toBe(KeyType::BigInt);
-
+    it('returns the default only when the key is absent or null', function (): void {
         config()->set('toolbox.kt', null);
-        expect(Config::enumOr('toolbox.kt', KeyType::class, KeyType::Ulid))->toBe(KeyType::Ulid);
+
+        expect(Config::enum('toolbox.kt', KeyType::class, KeyType::Ulid))->toBe(KeyType::Ulid)
+            ->and(Config::enum('toolbox.never_set', KeyType::class, KeyType::Uuid))->toBe(KeyType::Uuid)
+            ->and(Config::for([])->enum('attestation', KeyType::class, KeyType::BigInt))->toBe(KeyType::BigInt);
     });
+
+    it('throws when the key is absent and there is no default', function (): void {
+        config()->set('toolbox.kt', null);
+
+        Config::enum('toolbox.kt', KeyType::class);
+    })->throws(InvalidConfigurationException::class, 'Configuration value [toolbox.kt] is required but missing.');
+
+    it('THROWS on an unknown value even when a default is given', function (mixed $value, string $given): void {
+        config()->set('toolbox.kt', $value);
+
+        expect(fn (): KeyType => Config::enum('toolbox.kt', KeyType::class, KeyType::BigInt))->toThrow(
+            InvalidConfigurationException::class,
+            "Configuration value [toolbox.kt] must be one of [bigint, uuid, ulid], [{$given}] given.",
+        );
+    })->with([
+        'a typo' => ['uudi', 'uudi'],
+        'a different case' => ['UUID', 'UUID'],
+        'padded' => [' uuid', ' uuid'],
+        'an empty string' => ['', "''"],
+        'an int' => [1, '1'],
+        'false' => [false, 'false'],
+        'another enum' => [Priority::High, Priority::class],
+    ]);
+
+    it('has a single strict enum reader', function (): void {
+        expect(method_exists(Config::class, 'enumOr'))->toBeFalse()
+            ->and(method_exists(ConfigValidator::class, 'enumOr'))->toBeFalse();
+    });
+});
+
+describe('oneOf', function (): void {
+    it('returns an allowed value', function (): void {
+        config()->set('toolbox.driver', 'redis');
+
+        expect(Config::oneOf('toolbox.driver', ['array', 'redis', 'database'], 'array'))->toBe('redis');
+    });
+
+    it('returns the default only when the key is absent or null', function (): void {
+        config()->set('toolbox.driver', null);
+
+        expect(Config::oneOf('toolbox.driver', ['array', 'redis'], 'array'))->toBe('array')
+            ->and(Config::for([])->oneOf('driver', ['array', 'redis'], 'redis'))->toBe('redis');
+    });
+
+    it('THROWS on anything outside the vocabulary, listing it', function (mixed $value, string $given): void {
+        config()->set('toolbox.driver', $value);
+
+        expect(fn (): string => Config::oneOf('toolbox.driver', ['array', 'redis'], 'array'))->toThrow(
+            InvalidConfigurationException::class,
+            "Configuration value [toolbox.driver] must be one of [array, redis], [{$given}] given.",
+        );
+    })->with([
+        'a typo' => ['reddis', 'reddis'],
+        'a different case' => ['Redis', 'Redis'],
+        'an empty string' => ['', "''"],
+        'an int' => [1, '1'],
+        'an array' => [['redis'], 'array'],
+    ]);
+
+    it('rejects a default outside the vocabulary', function (): void {
+        Config::oneOf('toolbox.never_set', ['array', 'redis'], 'file');
+    })->throws(InvalidConfigurationException::class, 'Configuration value [toolbox.never_set] must be one of [array, redis], [file] given.');
+
+    it('throws the nominated exception', function (): void {
+        Config::using(CustomConfigException::class)->oneOf('toolbox.never_set', ['a'], 'b');
+    })->throws(CustomConfigException::class, 'must be one of [a], [b] given.');
 });
 
 describe('boolean', function (): void {
@@ -139,38 +255,8 @@ describe('boolean', function (): void {
 
     it('has a single boolean reader, with no separate strict twin', function (): void {
         expect(method_exists(Config::class, 'strictBoolean'))->toBeFalse()
-            ->and(method_exists(RoundlyConsulting\PackageToolkit\Support\ConfigValidator::class, 'strictBoolean'))->toBeFalse();
+            ->and(method_exists(ConfigValidator::class, 'strictBoolean'))->toBeFalse();
     });
-});
-
-describe('enum (strict)', function (): void {
-    it('maps a recognized value', function (): void {
-        config()->set('toolbox.kt', 'uuid');
-
-        expect(Config::enum('toolbox.kt', KeyType::class))->toBe(KeyType::Uuid);
-    });
-
-    it('passes through an enum instance', function (): void {
-        config()->set('toolbox.kt', KeyType::Ulid);
-
-        expect(Config::enum('toolbox.kt', KeyType::class))->toBe(KeyType::Ulid);
-    });
-
-    it('THROWS on a typo where enumOr would silently fall back', function (): void {
-        config()->set('toolbox.kt', 'uudi');
-
-        // enumOr is lenient — it downgrades to the default without a peep.
-        expect(Config::enumOr('toolbox.kt', KeyType::class, KeyType::BigInt))->toBe(KeyType::BigInt);
-
-        // enum is strict — the same typo fails loudly, listing the valid cases.
-        Config::enum('toolbox.kt', KeyType::class);
-    })->throws(InvalidConfigurationException::class, 'must be one of [bigint, uuid, ulid]');
-
-    it('throws when the value is missing', function (): void {
-        config()->set('toolbox.kt', null);
-
-        Config::enum('toolbox.kt', KeyType::class);
-    })->throws(InvalidConfigurationException::class, 'required but missing');
 });
 
 describe('array validation via for()', function (): void {
@@ -180,34 +266,29 @@ describe('array validation via for()', function (): void {
         // validating the array must REJECT 99999.
         config()->set('passkeys.timeout', 60);
 
-        Config::for(['timeout' => 99999])->intBetween('timeout', 1, 300, 60);
+        Config::for(['timeout' => 99999])->integer('timeout', 60, min: 1, max: 300);
     })->throws(InvalidConfigurationException::class, 'between 1 and 300');
 
     it('reads values out of the handed array, including dot notation', function (): void {
-        $config = ['timeout' => '120', 'attestation' => 'uuid', 'nested' => ['flag' => 'true']];
+        $config = ['timeout' => '120', 'attestation' => 'uuid', 'nested' => ['flag' => 'true'], 'driver' => 'redis'];
 
         $validator = Config::for($config);
 
-        expect($validator->intBetween('timeout', 1, 300, 60))->toBe(120)
+        expect($validator->integer('timeout', 60, min: 1, max: 300))->toBe(120)
             ->and($validator->enum('attestation', KeyType::class))->toBe(KeyType::Uuid)
-            ->and($validator->boolean('nested.flag'))->toBeTrue();
+            ->and($validator->boolean('nested.flag'))->toBeTrue()
+            ->and($validator->oneOf('driver', ['array', 'redis'], 'array'))->toBe('redis');
     });
 
     it('rejects a strict enum typo in a handed array', function (): void {
-        Config::for(['attestation' => 'bassic'])->enum('attestation', KeyType::class);
+        Config::for(['attestation' => 'bassic'])->enum('attestation', KeyType::class, KeyType::BigInt);
     })->throws(InvalidConfigurationException::class, 'must be one of');
-
-    it('falls back to the default for a missing optional key', function (): void {
-        expect(Config::for([])->intBetween('timeout', 1, 300, 60))->toBe(60)
-            ->and(Config::for([])->enumOr('attestation', KeyType::class, KeyType::BigInt))->toBe(KeyType::BigInt)
-            ->and(Config::for([])->boolean('flag', true))->toBeTrue();
-    });
 });
 
 describe('nominated exception class', function (): void {
     it('throws the package exception from an array validator', function (): void {
         Config::for(['timeout' => 99999], CustomConfigException::class)
-            ->intBetween('timeout', 1, 300, 60);
+            ->integer('timeout', 60, min: 1, max: 300);
     })->throws(CustomConfigException::class, 'between 1 and 300');
 
     it('throws the package exception from a repository validator', function (): void {
@@ -217,18 +298,18 @@ describe('nominated exception class', function (): void {
     })->throws(CustomConfigException::class, 'must be one of');
 
     it('preserves the toolkit exception message when none is nominated', function (): void {
-        Config::for(['timeout' => 99999])->intBetween('timeout', 1, 300, 60);
-    })->throws(InvalidConfigurationException::class, 'between 1 and 300');
+        Config::for(['timeout' => 99999])->integer('timeout', 60, min: 1, max: 300);
+    })->throws(InvalidConfigurationException::class, 'Configuration value [timeout] must be between 1 and 300, [99999] given.');
 });
 
 describe('enum backing-type coercion', function (): void {
     // strict_types makes Priority::tryFrom('2') a TypeError, and every env value is a
     // string — so an int-backed enum read from env must be coerced, never passed raw.
-    it('coerces a numeric env string into an int-backed case', function (string $value, Priority $expected): void {
+    it('coerces a canonical integer string into an int-backed case', function (string $value, Priority $expected): void {
         config()->set('toolbox.priority', $value);
 
         expect(Config::enum('toolbox.priority', Priority::class))->toBe($expected)
-            ->and(Config::enumOr('toolbox.priority', Priority::class, Priority::Low))->toBe($expected)
+            ->and(Config::enum('toolbox.priority', Priority::class, Priority::Low))->toBe($expected)
             ->and(Config::for(['priority' => $value])->enum('priority', Priority::class))->toBe($expected);
     })->with([
         ['2', Priority::High],
@@ -246,66 +327,33 @@ describe('enum backing-type coercion', function (): void {
         config()->set('toolbox.version', 2);
 
         expect(Config::enum('toolbox.version', Version::class))->toBe(Version::Two)
-            ->and(Config::enumOr('toolbox.version', Version::class, Version::One))->toBe(Version::Two);
+            ->and(Config::enum('toolbox.version', Version::class, Version::One))->toBe(Version::Two);
     });
 
-    it('lets enumOr fall back instead of crashing on a mismatched type', function (mixed $value): void {
-        config()->set('toolbox.priority', $value);
-        config()->set('toolbox.kt', $value);
-
-        expect(Config::enumOr('toolbox.priority', Priority::class, Priority::Low))->toBe(Priority::Low)
-            ->and(Config::enumOr('toolbox.kt', KeyType::class, KeyType::Ulid))->toBe(KeyType::Ulid);
-    })->with([
-        'unknown int' => [1],
-        'non-numeric string' => ['high'],
-        'malformed number' => ['--2'],
-        'decimal string' => ['2.0'],
-        'float' => [2.0],
-        'bool' => [true],
-        'overflowing number' => ['99999999999999999999'],
-    ]);
-
-    it('throws the configuration exception, never a TypeError, for a mismatched type', function (mixed $value): void {
+    it('throws the configuration exception, never a TypeError or the default, for a mismatched type', function (mixed $value, string $given): void {
         config()->set('toolbox.priority', $value);
 
-        expect(fn () => Config::enum('toolbox.priority', Priority::class))
-            ->toThrow(InvalidConfigurationException::class, 'must be one of [1, 2, -1]');
+        expect(fn (): Priority => Config::enum('toolbox.priority', Priority::class, Priority::Low))
+            ->toThrow(InvalidConfigurationException::class, "must be one of [1, 2, -1], [{$given}] given.");
     })->with([
-        ['high'],
-        ['2.0'],
-        ['--2'],
-        [2.5],
-        [['2']],
+        'unknown int' => [3, '3'],
+        'non-numeric string' => ['high', 'high'],
+        'malformed number' => ['--2', '--2'],
+        'decimal string' => ['2.0', '2.0'],
+        'explicit plus' => ['+2', '+2'],
+        'float' => [2.5, '2.5'],
+        'bool' => [true, 'true'],
+        'overflowing number' => ['99999999999999999999', '99999999999999999999'],
+        'array' => [['2'], 'array'],
     ]);
 
     it('throws the configuration exception for an int no string-backed case matches', function (): void {
         config()->set('toolbox.kt', 1);
 
         Config::enum('toolbox.kt', KeyType::class);
-    })->throws(InvalidConfigurationException::class, 'must be one of [bigint, uuid, ulid]');
+    })->throws(InvalidConfigurationException::class, 'must be one of [bigint, uuid, ulid], [1] given.');
 
     it('throws the nominated exception for a mismatched type', function (): void {
         Config::for(['priority' => 'x'], CustomConfigException::class)->enum('priority', Priority::class);
-    })->throws(CustomConfigException::class, 'must be one of [1, 2, -1]');
-});
-
-describe('intBetween rejects malformed numbers', function (): void {
-    it('throws instead of silently coercing', function (string $value): void {
-        config()->set('toolbox.n', $value);
-
-        Config::intBetween('toolbox.n', -10, 10, 3);
-    })->throws(InvalidConfigurationException::class, 'must be an integer')->with([
-        ['--5'],
-        ['-'],
-        ['5-'],
-        ['-5-'],
-        ['1.5'],
-        ['99999999999999999999'],
-    ]);
-
-    it('accepts a signed integer string', function (): void {
-        config()->set('toolbox.n', '-5');
-
-        expect(Config::intBetween('toolbox.n', -10, 10, 3))->toBe(-5);
-    });
+    })->throws(CustomConfigException::class, 'must be one of [1, 2, -1], [x] given.');
 });

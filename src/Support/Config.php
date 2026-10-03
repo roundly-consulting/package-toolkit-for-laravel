@@ -22,13 +22,14 @@ use Throwable;
 final class Config
 {
     /**
-     * An integer config value that must fall within `[$min, $max]`. Falls back
-     * to `$default` when the key is absent (null); throws when present but not
-     * an integer or out of range.
+     * An integer config value: `$default` only when the key is absent (null);
+     * otherwise an `int` or a canonical integer string (`'30'`, `'-5'`, `' 30 '`),
+     * bounded by `$min` / `$max` when given. Anything else — `'five'`, `'5.5'`,
+     * `'1e3'`, `''`, a bool — throws, and so does a value (or default) out of range.
      */
-    public static function intBetween(string $key, int $min, int $max, int $default): int
+    public static function integer(string $key, int $default, ?int $min = null, ?int $max = null): int
     {
-        return ConfigValidator::forRepository()->intBetween($key, $min, $max, $default);
+        return ConfigValidator::forRepository()->integer($key, $default, $min, $max);
     }
 
     /**
@@ -41,35 +42,32 @@ final class Config
     }
 
     /**
-     * A strict backed-enum config value: throws when the configured value is
-     * missing or not a recognized case. Use this — not {@see self::enumOr()} —
-     * for security-sensitive parameters, so an env typo fails loudly instead of
-     * silently downgrading to a default.
+     * A backed-enum config value: `$default` only when the key is absent (null)
+     * — or a throw when no default is given. A case, or its exact
+     * (case-sensitive) backing value, resolves; anything else throws, listing the
+     * allowed values, so an env typo never silently downgrades to the default.
      *
      * @template TEnum of BackedEnum
      *
      * @param  class-string<TEnum>  $enum
+     * @param  TEnum|null  $default
      * @return TEnum
      */
-    public static function enum(string $key, string $enum): BackedEnum
+    public static function enum(string $key, string $enum, ?BackedEnum $default = null): BackedEnum
     {
-        return ConfigValidator::forRepository()->enum($key, $enum);
+        return ConfigValidator::forRepository()->enum($key, $enum, $default);
     }
 
     /**
-     * A backed-enum config value, falling back to `$default` for a missing or
-     * unrecognized value (this accessor is lenient by design — hence "Or"). For
-     * a security parameter use {@see self::enum()} instead.
+     * A string config value from a fixed vocabulary (for a setting with no enum):
+     * `$default` only when the key is absent (null); anything outside `$allowed`
+     * (exact, case-sensitive) throws, listing it.
      *
-     * @template TEnum of BackedEnum
-     *
-     * @param  class-string<TEnum>  $enum
-     * @param  TEnum  $default
-     * @return TEnum
+     * @param  non-empty-list<string>  $allowed
      */
-    public static function enumOr(string $key, string $enum, BackedEnum $default): BackedEnum
+    public static function oneOf(string $key, array $allowed, string $default): string
     {
-        return ConfigValidator::forRepository()->enumOr($key, $enum, $default);
+        return ConfigValidator::forRepository()->oneOf($key, $allowed, $default);
     }
 
     /**

@@ -54,21 +54,24 @@ final class ConfigValidator
     }
 
     /**
-     * An integer value that must fall within `[$min, $max]`. Falls back to
-     * `$default` when absent (null); throws when present but not an integer or
-     * out of range. A (signed) integer string — every env value is a string —
-     * is coerced; anything else, including a malformed `--5`, throws.
+     * An integer. Falls back to `$default` only when absent (null); anything else
+     * must be an `int` or a canonical integer string (an optional `-`, decimal
+     * digits, surrounding whitespace ignored — every env value is a string), and
+     * THROWS otherwise: `'five'`, `'5.5'`, `'5abc'`, `''`, `'1e3'`, `'0x10'`, `'+5'`,
+     * an overflowing number, a float, a bool or an array never become a number.
+     * `$min` / `$max`, when given, bound the result — the default included.
      */
-    public function intBetween(string $key, int $min, int $max, int $default): int
+    public function integer(string $key, int $default, ?int $min = null, ?int $max = null): int
     {
-        $value = self::toInteger($this->read($key) ?? $default);
+        $raw = $this->read($key);
+        $value = $raw === null ? $default : self::toInteger($raw);
 
         if ($value === null) {
-            throw $this->fail(InvalidConfigurationException::notAnInteger($key));
+            throw $this->fail(InvalidConfigurationException::notAnInteger($key, $raw));
         }
 
-        if ($value < $min || $value > $max) {
-            throw $this->fail(InvalidConfigurationException::outOfRange($key, $min, $max));
+        if (($min !== null && $value < $min) || ($max !== null && $value > $max)) {
+            throw $this->fail(InvalidConfigurationException::outOfRange($key, $min, $max, $raw ?? $default));
         }
 
         return $value;
@@ -86,51 +89,54 @@ final class ConfigValidator
         }
 
         if (! is_string($value) || trim($value) === '') {
-            throw $this->fail(InvalidConfigurationException::notAString($key));
+            throw $this->fail(InvalidConfigurationException::notAString($key, $value));
         }
 
         return $value;
     }
 
     /**
-     * A strict backed-enum value: throws when missing or not a recognized case.
-     * Use this — not `enumOr` — for security-sensitive parameters, so a typo
-     * fails loudly instead of silently downgrading to a default. The value is
-     * coerced to the enum's backing type first (see {@see self::toCase()}), so an
-     * env string `'2'` resolves an int-backed case.
+     * A backed-enum value. Absent (null) returns `$default`, or throws when no
+     * default is given. A case of the enum is returned as-is; any other value must
+     * be one of the backing values — matched exactly and case-sensitively, after
+     * coercion to the enum's backing type (see {@see self::toCase()}) — or it
+     * THROWS, listing the allowed values. A default never stands in for a typo.
      *
      * @template TEnum of BackedEnum
      *
      * @param  class-string<TEnum>  $enum
+     * @param  TEnum|null  $default
      * @return TEnum
      */
-    public function enum(string $key, string $enum): BackedEnum
+    public function enum(string $key, string $enum, ?BackedEnum $default = null): BackedEnum
     {
         $value = $this->read($key);
 
         if ($value === null) {
-            throw $this->fail(InvalidConfigurationException::missing($key));
+            return $default ?? throw $this->fail(InvalidConfigurationException::missing($key));
         }
 
         return self::toCase($enum, $value)
-            ?? throw $this->fail(InvalidConfigurationException::notAValidEnum($key, $enum));
+            ?? throw $this->fail(InvalidConfigurationException::notAValidEnum($key, $enum, $value));
     }
 
     /**
-     * A backed-enum value, falling back to `$default` for a missing or
-     * unrecognized value — including one of a type the enum cannot be backed by
-     * (lenient by design — hence "Or"). Never use this for a security parameter;
-     * reach for `enum()` instead.
+     * A string from a fixed vocabulary, for a setting with no enum of its own.
+     * Absent (null) returns `$default`; anything else must be one of `$allowed`
+     * (exact, case-sensitive) or it THROWS, listing them — and so does a default
+     * outside the vocabulary.
      *
-     * @template TEnum of BackedEnum
-     *
-     * @param  class-string<TEnum>  $enum
-     * @param  TEnum  $default
-     * @return TEnum
+     * @param  non-empty-list<string>  $allowed
      */
-    public function enumOr(string $key, string $enum, BackedEnum $default): BackedEnum
+    public function oneOf(string $key, array $allowed, string $default): string
     {
-        return self::toCase($enum, $this->read($key)) ?? $default;
+        $value = $this->read($key) ?? $default;
+
+        if (! is_string($value) || ! in_array($value, $allowed, true)) {
+            throw $this->fail(InvalidConfigurationException::notOneOf($key, $allowed, $value));
+        }
+
+        return $value;
     }
 
     /**
@@ -154,7 +160,8 @@ final class ConfigValidator
     }
 
     /**
-     * The case of `$enum` a raw config value names, or null when it names none.
+     * The case of `$enum` a raw config value names, or null when it names none —
+     * including a case of a different enum.
      *
      * `tryFrom()` is typed on the enum's backing type, so under `strict_types` a
      * string handed to an int-backed enum is a `TypeError`, not a miss — and every
@@ -187,10 +194,11 @@ final class ConfigValidator
     }
 
     /**
-     * An int, or a (signed, optionally whitespace-padded) integer string that
-     * fits in one; null for anything else. Rejects what a blunt `(int)` cast
-     * would quietly turn into a different number — `'--5'` (0), `'1.5'` (1), or
-     * an overflowing `'99999999999999999999'` (PHP_INT_MAX).
+     * An int, or a canonical integer string (optional `-`, decimal digits,
+     * optionally whitespace-padded) that fits in one; null for anything else.
+     * Rejects what a blunt `(int)` cast would quietly turn into a different
+     * number — `'--5'` (0), `'1.5'` (1), `'5abc'` (5), `'1e3'` (1000), or an
+     * overflowing `'99999999999999999999'` (PHP_INT_MAX) — and an explicit `+`.
      */
     private static function toInteger(mixed $value): ?int
     {
