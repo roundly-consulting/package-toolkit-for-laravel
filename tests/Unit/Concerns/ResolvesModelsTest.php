@@ -22,6 +22,19 @@ it('falls back to the trait default only when the key is absent or null', functi
         ->and((new ModelRegistry)->widget())->toBeInstanceOf(Note::class);
 });
 
+it('reads a blank value as not set, so the trait default applies', function (string $blank): void {
+    config()->set('toolbox.models.widget', $blank);
+
+    expect((new ModelRegistry)->widgetClass())->toBe(Note::class)
+        ->and((new ModelRegistry)->widget())->toBeInstanceOf(Note::class);
+})->with([
+    'empty' => [''],
+    'spaces' => ['   '],
+    'a tab' => ["\t"],
+    'a newline' => ["\n"],
+    'mixed whitespace' => [" \t\r\n "],
+]);
+
 it('refuses a model that does not extend the default instead of falling back', function (): void {
     config()->set('toolbox.models.widget', Counter::class);
 

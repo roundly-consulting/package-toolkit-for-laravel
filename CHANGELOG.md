@@ -26,8 +26,8 @@ Initial public release.
   driver, and a `DatabaseDriver` enum.
 - Strict config readers — `Config::integer()` (canonical integer strings only, optional
   bounds), `requireString()`, `enum()` (optional default), `oneOf()` and `boolean()`: the
-  default applies only to an absent key, and a present but invalid value throws a message
-  naming the key and the value. `Config::for()` / `using()` validate a DTO's input array or
+  default applies only to a key that is not set (absent, null, or blank — `''` / whitespace,
+  a host's `KEY=`), and any other invalid value throws a message naming the key and the value. `Config::for()` / `using()` validate a DTO's input array or
   throw your own exception class.
 - `ModelResolver` to resolve model classes named in config, refusing any class that isn't the
   packaged model or a subclass of it (or an explicitly widened base).

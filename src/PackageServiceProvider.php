@@ -82,10 +82,11 @@ abstract class PackageServiceProvider extends ServiceProvider
     /**
      * The alias name to register for a declaration, or `null` to skip it. The
      * config value (when the declaration names one) is read strictly, via
-     * {@see Config::boolean()}: `null`, or a false spelling (`false`, `0`,
-     * `''`, `'0'`, `'false'`, `'off'`, `'no'`) skips aliasing; a true spelling
-     * (`true`, `1`, `'1'`, `'true'`, `'on'`, `'yes'`) or an absent key uses the
-     * declared default (the facade's base name); any other non-empty string
+     * {@see Config::boolean()}: an explicit `null`, or a false spelling (`false`,
+     * `0`, `'0'`, `'false'`, `'off'`, `'no'`) skips aliasing; a true spelling
+     * (`true`, `1`, `'1'`, `'true'`, `'on'`, `'yes'`), an absent key or a blank
+     * value (`''`, whitespace — not set) uses the declared default (the facade's
+     * base name); any other non-empty string
      * renames the alias. Anything else (`2`, `1.5`, an array) throws
      * {@see InvalidConfigurationException} instead of quietly aliasing.
      *
@@ -234,7 +235,7 @@ abstract class PackageServiceProvider extends ServiceProvider
     /**
      * Bind a contract to the implementation named by a config key. Call from an
      * overridden `register()`. Config is read when the contract is resolved: an
-     * absent or null value binds `$default`; any other value must name an
+     * absent, null or blank value binds `$default`; any other value must name an
      * existing class that is a `$contract`, or resolving THROWS
      * {@see InvalidConfigurationException} (so `false`, `''`, a missing class, a
      * class of the wrong type, or the contract itself never resolve silently).
@@ -247,7 +248,8 @@ abstract class PackageServiceProvider extends ServiceProvider
         $this->app->bind($contract, function () use ($contract, $configKey, $default): mixed {
             $configured = config($configKey);
 
-            if ($configured === null) {
+            // Blank (`''`, whitespace — a host's `KEY=`) is not set, exactly like absent.
+            if ($configured === null || (is_string($configured) && trim($configured) === '')) {
                 return $this->app->make($default);
             }
 

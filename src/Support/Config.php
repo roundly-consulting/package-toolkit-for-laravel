@@ -22,10 +22,11 @@ use Throwable;
 final class Config
 {
     /**
-     * An integer config value: `$default` only when the key is absent (null);
+     * An integer config value: `$default` only when the key is not set (absent,
+     * null or blank);
      * otherwise an `int` or a canonical integer string (`'30'`, `'-5'`, `' 30 '`),
      * bounded by `$min` / `$max` when given. Anything else — `'five'`, `'5.5'`,
-     * `'1e3'`, `''`, a bool — throws, and so does a value (or default) out of range.
+     * `'1e3'`, a bool — throws, and so does a value (or default) out of range.
      */
     public static function integer(string $key, int $default, ?int $min = null, ?int $max = null): int
     {
@@ -33,8 +34,8 @@ final class Config
     }
 
     /**
-     * A required, non-empty string config value; throws when missing or of the
-     * wrong type.
+     * A required string config value; throws `missing` when not set (absent,
+     * null or blank) and when present but not a string.
      */
     public static function requireString(string $key): string
     {
@@ -42,7 +43,8 @@ final class Config
     }
 
     /**
-     * A backed-enum config value: `$default` only when the key is absent (null)
+     * A backed-enum config value: `$default` only when the key is not set (absent,
+     * null or blank)
      * — or a throw when no default is given. A case, or its exact
      * (case-sensitive) backing value, resolves; anything else throws, listing the
      * allowed values, so an env typo never silently downgrades to the default.
@@ -60,7 +62,7 @@ final class Config
 
     /**
      * A string config value from a fixed vocabulary (for a setting with no enum):
-     * `$default` only when the key is absent (null); anything outside `$allowed`
+     * `$default` only when the key is not set (absent, null or blank); anything outside `$allowed`
      * (exact, case-sensitive) throws, listing it.
      *
      * @param  non-empty-list<string>  $allowed
@@ -71,11 +73,10 @@ final class Config
     }
 
     /**
-     * A boolean config value: falls back to `$default` only when the key is
-     * absent (null), and throws when present but unparseable. The vocabulary is
-     * `filter_var`'s: `true`/`1`/`on`/`yes` and `false`/`0`/`off`/`no`/`''`,
-     * case-insensitive, so an env typo such as `disabled` fails loudly instead
-     * of silently reading as the default.
+     * A boolean config value: `true`/`1`/`on`/`yes` or `false`/`0`/`off`/`no`
+     * (case-insensitive). Not set — absent, null or blank (`''`, a host's `KEY=`)
+     * — returns `$default`; anything else throws, so an env typo such as
+     * `disabled` fails loudly instead of silently reading as the default.
      */
     public static function boolean(string $key, bool $default = false): bool
     {

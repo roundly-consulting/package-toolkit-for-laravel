@@ -49,9 +49,25 @@ it('refuses a model that does not extend the packaged default, instead of fallin
     'an unrelated model' => [Counter::class, Counter::class],
     'a non-model class' => [stdClass::class, 'stdClass'],
     'a missing class' => ['App\\Models\\Missing', 'App\\Models\\Missing'],
-    'an empty string' => ['', "''"],
     'false' => [false, 'false'],
     'an array' => [[Note::class], 'array'],
+]);
+
+it('reads a blank value as not set: the default, or a null error without one', function (string $blank): void {
+    config()->set('toolbox.models.note', $blank);
+
+    expect(ModelResolver::for('toolbox.models.note', Note::class))->toBe(Note::class)
+        ->and(ModelResolver::newModel('toolbox.models.note', Note::class))->toBeInstanceOf(Note::class)
+        ->and(fn (): string => ModelResolver::for('toolbox.models.note'))->toThrow(
+            InvalidConfigurationException::class,
+            'Configuration value [toolbox.models.note] must be a class-string of ['.Model::class.'], [null] given.',
+        );
+})->with([
+    'empty' => [''],
+    'spaces' => ['   '],
+    'a tab' => ["\t"],
+    'a newline' => ["\n"],
+    'mixed whitespace' => [" \t\r\n "],
 ]);
 
 it('lets a package widen the required base when its default is only a suggestion', function (): void {

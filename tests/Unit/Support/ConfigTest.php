@@ -38,8 +38,6 @@ describe('integer', function (): void {
         'a word' => ['five', 'five'],
         'a decimal string' => ['5.5', '5.5'],
         'trailing junk' => ['5abc', '5abc'],
-        'an empty string' => ['', "''"],
-        'blank' => ['  ', '  '],
         'an exponent' => ['1e3', '1e3'],
         'hex' => ['0x10', '0x10'],
         'an explicit plus' => ['+5', '+5'],
@@ -53,6 +51,26 @@ describe('integer', function (): void {
         'false' => [false, 'false'],
         'an array' => [[5], 'array'],
     ]);
+
+    it('reads a blank value as not set, so the default applies', function (string $blank): void {
+        config()->set('toolbox.n', $blank);
+
+        expect(Config::integer('toolbox.n', 3))->toBe(3)
+            ->and(Config::integer('toolbox.n', 7, min: 1, max: 10))->toBe(7)
+            ->and(Config::for(['n' => $blank])->integer('n', 9))->toBe(9);
+    })->with([
+        'empty' => [''],
+        'spaces' => ['   '],
+        'a tab' => ["\t"],
+        'a newline' => ["\n"],
+        'mixed whitespace' => [" \t\r\n "],
+    ]);
+
+    it('range-checks the default it falls back to for a blank value', function (): void {
+        config()->set('toolbox.n', '');
+
+        Config::integer('toolbox.n', 0, min: 1, max: 10);
+    })->throws(InvalidConfigurationException::class, 'Configuration value [toolbox.n] must be between 1 and 10, [0] given.');
 
     it('range-checks the value, naming the bound and the value', function (mixed $value, ?int $min, ?int $max, string $message): void {
         config()->set('toolbox.n', $value);
@@ -99,7 +117,25 @@ describe('requireString', function (): void {
         Config::requireString('toolbox.s');
     })->throws(InvalidConfigurationException::class, 'Configuration value [toolbox.s] is required but missing.');
 
-    it('throws when blank or of the wrong type, naming the value', function (mixed $value, string $given): void {
+    it('reports a blank value as missing, exactly like an absent key', function (string $blank): void {
+        config()->set('toolbox.s', $blank);
+
+        expect(fn (): string => Config::requireString('toolbox.s'))->toThrow(
+            InvalidConfigurationException::class,
+            'Configuration value [toolbox.s] is required but missing.',
+        )->and(fn (): string => Config::for(['s' => $blank])->requireString('s'))->toThrow(
+            InvalidConfigurationException::class,
+            'Configuration value [s] is required but missing.',
+        );
+    })->with([
+        'empty' => [''],
+        'spaces' => ['   '],
+        'a tab' => ["\t"],
+        'a newline' => ["\n"],
+        'mixed whitespace' => [" \t\r\n "],
+    ]);
+
+    it('throws when of the wrong type, naming the value', function (mixed $value, string $given): void {
         config()->set('toolbox.s', $value);
 
         expect(fn (): string => Config::requireString('toolbox.s'))->toThrow(
@@ -107,8 +143,6 @@ describe('requireString', function (): void {
             "Configuration value [toolbox.s] must be a non-empty string, [{$given}] given.",
         );
     })->with([
-        'blank' => ['   ', '   '],
-        'empty' => ['', "''"],
         'an integer' => [5, '5'],
         'false' => [false, 'false'],
         'an array' => [['x'], 'array'],
@@ -149,10 +183,26 @@ describe('enum', function (): void {
         'a typo' => ['uudi', 'uudi'],
         'a different case' => ['UUID', 'UUID'],
         'padded' => [' uuid', ' uuid'],
-        'an empty string' => ['', "''"],
         'an int' => [1, '1'],
         'false' => [false, 'false'],
         'another enum' => [Priority::High, Priority::class],
+    ]);
+
+    it('reads a blank value as not set: the default, or missing without one', function (string $blank): void {
+        config()->set('toolbox.kt', $blank);
+
+        expect(Config::enum('toolbox.kt', KeyType::class, KeyType::Ulid))->toBe(KeyType::Ulid)
+            ->and(Config::for(['kt' => $blank])->enum('kt', KeyType::class, KeyType::Uuid))->toBe(KeyType::Uuid)
+            ->and(fn (): KeyType => Config::enum('toolbox.kt', KeyType::class))->toThrow(
+                InvalidConfigurationException::class,
+                'Configuration value [toolbox.kt] is required but missing.',
+            );
+    })->with([
+        'empty' => [''],
+        'spaces' => ['   '],
+        'a tab' => ["\t"],
+        'a newline' => ["\n"],
+        'mixed whitespace' => [" \t\r\n "],
     ]);
 
     it('has a single strict enum reader', function (): void {
@@ -185,9 +235,21 @@ describe('oneOf', function (): void {
     })->with([
         'a typo' => ['reddis', 'reddis'],
         'a different case' => ['Redis', 'Redis'],
-        'an empty string' => ['', "''"],
         'an int' => [1, '1'],
         'an array' => [['redis'], 'array'],
+    ]);
+
+    it('reads a blank value as not set, so the default applies', function (string $blank): void {
+        config()->set('toolbox.driver', $blank);
+
+        expect(Config::oneOf('toolbox.driver', ['array', 'redis'], 'redis'))->toBe('redis')
+            ->and(Config::for(['driver' => $blank])->oneOf('driver', ['array', 'redis'], 'array'))->toBe('array');
+    })->with([
+        'empty' => [''],
+        'spaces' => ['   '],
+        'a tab' => ["\t"],
+        'a newline' => ["\n"],
+        'mixed whitespace' => [" \t\r\n "],
     ]);
 
     it('rejects a default outside the vocabulary', function (): void {
@@ -207,7 +269,23 @@ describe('boolean', function (): void {
     })->with([
         [true, true], [false, false], [1, true], [0, false], [1.0, true], [0.0, false],
         ['true', true], ['TRUE', true], ['1', true], ['on', true], ['yes', true], [' Yes ', true], ["true\n", true],
-        ['false', false], ['0', false], ['off', false], ['no', false], ['', false], ['   ', false], ['OFF', false],
+        ['false', false], ['0', false], ['off', false], ['no', false], ['OFF', false],
+    ]);
+
+    it('reads a blank value as not set, so the default applies, never false', function (string $blank): void {
+        config()->set('toolbox.b', $blank);
+
+        expect(Config::boolean('toolbox.b', true))->toBeTrue()
+            ->and(Config::boolean('toolbox.b', false))->toBeFalse()
+            ->and(Config::boolean('toolbox.b'))->toBeFalse()
+            ->and(Config::for(['b' => $blank])->boolean('b', true))->toBeTrue()
+            ->and(Config::using(CustomConfigException::class)->boolean('toolbox.b', true))->toBeTrue();
+    })->with([
+        'empty' => [''],
+        'spaces' => ['   '],
+        'a tab' => ["\t"],
+        'a newline' => ["\n"],
+        'mixed whitespace' => [" \t\r\n "],
     ]);
 
     it('falls back to the default only when the key is absent or null', function (): void {

@@ -25,6 +25,18 @@ it('binds the default when the value is null', function (): void {
     expect(app(Greeter::class))->toBeInstanceOf(EnglishGreeter::class);
 });
 
+it('binds the default when the value is blank, exactly as if it were not set', function (string $blank): void {
+    config()->set('toolbox.greeter', $blank);
+
+    expect(app(Greeter::class))->toBeInstanceOf(EnglishGreeter::class);
+})->with([
+    'empty' => [''],
+    'spaces' => ['   '],
+    'a tab' => ["\t"],
+    'a newline' => ["\n"],
+    'mixed whitespace' => [" \t\r\n "],
+]);
+
 it('binds the implementation config names', function (): void {
     config()->set('toolbox.greeter', FrenchGreeter::class);
 
@@ -41,7 +53,6 @@ it('refuses a configured value that is not a class-string of the contract', func
 })->with([
     'false' => [false, 'false'],
     'true' => [true, 'true'],
-    'an empty string' => ['', "''"],
     'an integer' => [42, '42'],
     'an array' => [[FrenchGreeter::class], 'array'],
     'a missing class' => ['App\\Greeters\\Missing', 'App\\Greeters\\Missing'],

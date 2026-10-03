@@ -26,7 +26,8 @@ enum KeyType: string
     /**
      * Resolve the key type configured at `$key`: a `KeyType` case, or its value
      * (`bigint`, `uuid`, `ulid` — case-insensitive and trimmed). Falls back to
-     * `$default` only when the key is absent or null; any other value THROWS, so
+     * `$default` only when the key is not set (absent, null or blank — `''` or
+     * whitespace); any other value THROWS, so
      * a typo such as `'uiid'` stops the app instead of silently building bigint
      * columns for a UUID-keyed host.
      *
@@ -36,7 +37,7 @@ enum KeyType: string
     {
         $value = config($key);
 
-        if ($value === null) {
+        if ($value === null || (is_string($value) && trim($value) === '')) {
             return $default;
         }
 

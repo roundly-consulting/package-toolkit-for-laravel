@@ -33,8 +33,9 @@ database/config/model helpers — using only official Laravel and Symfony APIs.
 - **Database helpers** — a `DatabaseDriver` enum, an injection-safe
   `whereLikeEscaped()` search that works on every Laravel database driver,
   strict config readers (integer, string, enum, fixed-vocabulary string and
-  boolean — a present but invalid value always throws, the default applies only
-  to an absent key — plus an array-validating entry point), and a model
+  boolean — a value that is not set (absent, null or blank, like a host's
+  `KEY=`) reads as the default, anything else invalid throws — plus an
+  array-validating entry point), and a model
   resolver that refuses a model not extending the packaged one.
 
 ## Requirements
@@ -89,9 +90,9 @@ for a non-standard layout.
 | `hasMigration(string $name)` | Publish a single `database/migrations/<name>.php.stub` under `<name>-migrations`, timestamp-injected. Use only for a `.php.stub` source; `.php` files are picked up by `hasMigrations()`. |
 | `hasTranslations()` | Load + publish translations (published to `lang/vendor/<name>`, tag `<name>-translations`). |
 | `hasViews(?string $namespace = null)` | Register + publish Blade views (namespace defaults to `<name>`, tag `<name>-views`). |
-| `hasRoutes(string $file, ?string $enabledVia = null)` | Load a route file (optionally gated behind a boolean config key) and publish it under `<name>-routes`. The switch is read like `Config::boolean()`: `false`/`0`/`'off'`/`'no'`/`'false'`/`''` skip the file; `true`/`1`/`'on'`/`'yes'`/`'true'`, an absent key or `null` load it; anything else (`'disabled'`, `'ture'`, `2`) throws `InvalidConfigurationException` at boot, so a typo never loads the routes. |
+| `hasRoutes(string $file, ?string $enabledVia = null)` | Load a route file (optionally gated behind a boolean config key) and publish it under `<name>-routes`. The switch is read like `Config::boolean()`: `false`/`0`/`'off'`/`'no'`/`'false'` skip the file; `true`/`1`/`'on'`/`'yes'`/`'true'`, or a switch that is not set (absent, `null`, blank `''`) load it; anything else (`'disabled'`, `'ture'`, `2`) throws `InvalidConfigurationException` at boot, so a typo never loads the routes. |
 | `hasCommands(array $commands)` | Register console commands (console only). |
-| `hasFacadeAlias(string $class, ?string $configKey = null)` | Register a class alias. The config value decides: `null` or a false spelling (`false`/`0`/`''`/`'0'`/`'false'`/`'off'`/`'no'`) skips it, a true spelling (`true`/`1`/`'1'`/`'on'`/`'yes'`) or an absent key uses the class's base name, any other non-empty string renames it. Any other value (`2`, `1.5`, an array) throws `InvalidConfigurationException`. |
+| `hasFacadeAlias(string $class, ?string $configKey = null)` | Register a class alias. The config value decides: an explicit `null` or a false spelling (`false`/`0`/`'0'`/`'false'`/`'off'`/`'no'`) skips it, a true spelling (`true`/`1`/`'1'`/`'on'`/`'yes'`), an absent key or a blank value (`''`, not set) uses the class's base name, any other non-empty string renames it. Any other value (`2`, `1.5`, an array) throws `InvalidConfigurationException`. |
 | `contributesToAbout(?Closure $data = null)` | Add a section to `php artisan about`. |
 | `publishesStubs(string $from, string $to, string $tag)` | Publish an arbitrary set of files under a custom tag. |
 
@@ -138,9 +139,9 @@ public function register(): void
 {
     parent::register();
 
-    // Bind a contract to the class named in config, with a default. Absent/null → the
-    // default; a value that isn't an existing class implementing the contract (false, '',
-    // a typo'd class name) throws InvalidConfigurationException when the contract resolves.
+    // Bind a contract to the class named in config, with a default. Absent/null/blank → the
+    // default; a value that isn't an existing class implementing the contract (false, a
+    // typo'd class name) throws InvalidConfigurationException when the contract resolves.
     $this->bindFromConfig(CommentRepository::class, 'comments.repository', EloquentCommentRepository::class);
 }
 
@@ -185,8 +186,8 @@ final class CommentsServiceProvider extends PackageServiceProvider
 
 Register the macros with `RegistersBlueprintMacros` (see above), then use them
 in migrations. `KeyType` resolves the host's chosen key strategy from config —
-a `KeyType` case or its (case-insensitive, trimmed) string value. An absent or
-null key reads as the default (`bigint`); any other value, such as a typo'd
+a `KeyType` case or its (case-insensitive, trimmed) string value. A key that is
+not set (absent, null or blank) reads as the default (`bigint`); any other value, such as a typo'd
 `'uiid'`, throws `InvalidConfigurationException` instead of silently building
 bigint columns:
 
@@ -257,10 +258,11 @@ DatabaseDriver::tryFrom($driver)?->isPgsql() ?? false;                 // reques
 // driver (sqlsrv included), with the user's % _ \ escaped via ESCAPE '\'.
 Comment::query()->whereLikeEscaped('body', $term);
 
-// Strict config readers: the default applies only to an absent (null) key; a present but
-// invalid value throws InvalidConfigurationException naming the key and the value.
-Config::integer('comments.per_page', 20, min: 1, max: 100);                 // '20' → 20; 'five', '5.5', '1e3', '' throw
-Config::requireString('comments.table');                                    // missing or blank throws
+// Strict config readers: the default applies only to a key that is not set (absent, null, or
+// blank like a host's `KEY=`); an invalid value throws InvalidConfigurationException naming
+// the key and the value.
+Config::integer('comments.per_page', 20, min: 1, max: 100);                 // '20' → 20; '' → 20; 'five', '5.5', '1e3' throw
+Config::requireString('comments.table');                                    // not set (absent or blank) throws `missing`
 Config::enum('comments.hash_algo', HashAlgorithm::class);                   // no default: missing throws too
 Config::enum('comments.sort', Sort::class, Sort::Newest);                   // absent → Sort::Newest; 'neweset' throws
 Config::oneOf('comments.renderer', ['markdown', 'plain'], 'markdown');      // absent → 'markdown'; 'html' throws
@@ -283,7 +285,8 @@ engine — SQLite's `LIKE` folds ASCII only, and MySQL, MariaDB and SQL Server
 follow the column's collation (their default collations are case-insensitive).
 
 **Integers** are an `int` or a canonical integer string: an optional `-`, decimal digits,
-surrounding whitespace ignored (`'30'`, `'-5'`, `' 30 '`). `'five'`, `'5.5'`, `'5abc'`, `''`,
+surrounding whitespace ignored (`'30'`, `'-5'`, `' 30 '`). `''` (not set) gives the default.
+`'five'`, `'5.5'`, `'5abc'`,
 `'1e3'`, `'0x10'`, `'+5'`, an overflowing number, a float, a bool or an array throw. A range
 check applies to the default too.
 

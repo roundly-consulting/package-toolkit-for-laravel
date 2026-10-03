@@ -61,9 +61,9 @@ it('skips the alias when the config value is null', function (): void {
     expect(registerAlias(null))->toBe([]);
 });
 
-it('skips the alias when the config value is an empty string', function (): void {
-    expect(registerAlias(''))->toBe([]);
-});
+it('falls back to the class base name when the config value is blank (not set)', function (string $blank): void {
+    expect(registerAlias($blank))->toBe(['Gadget' => Gadget::class]);
+})->with(['', '   ', "\t", "\n"]);
 
 it('refuses to register on an unparseable alias switch instead of aliasing', function (mixed $configured, string $given): void {
     try {
@@ -87,7 +87,7 @@ it('refuses to register on an unparseable alias switch instead of aliasing', fun
 
 it('skips the alias for an env-style string that parses as false', function (mixed $configured): void {
     expect(registerAlias($configured))->toBe([]);
-})->with(['off', '0', 'no', 'false', 'OFF', 'No', ' no ', '   ', 0, 0.0]);
+})->with(['off', '0', 'no', 'false', 'OFF', 'No', ' no ', 0, 0.0]);
 
 it('falls back to the class base name for an env-style string that parses as true', function (mixed $configured): void {
     expect(registerAlias($configured))->toBe(['Gadget' => Gadget::class]);

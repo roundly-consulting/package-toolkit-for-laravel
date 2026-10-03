@@ -54,10 +54,11 @@ final class ConfigValidator
     }
 
     /**
-     * An integer. Falls back to `$default` only when absent (null); anything else
+     * An integer. Falls back to `$default` only when not set (absent, null or
+     * blank — `''` or whitespace); anything else
      * must be an `int` or a canonical integer string (an optional `-`, decimal
      * digits, surrounding whitespace ignored — every env value is a string), and
-     * THROWS otherwise: `'five'`, `'5.5'`, `'5abc'`, `''`, `'1e3'`, `'0x10'`, `'+5'`,
+     * THROWS otherwise: `'five'`, `'5.5'`, `'5abc'`, `'1e3'`, `'0x10'`, `'+5'`,
      * an overflowing number, a float, a bool or an array never become a number.
      * `$min` / `$max`, when given, bound the result — the default included.
      */
@@ -78,7 +79,8 @@ final class ConfigValidator
     }
 
     /**
-     * A required, non-empty string value; throws when missing or the wrong type.
+     * A required string value; throws `missing` when not set (absent, null or
+     * blank) and `notAString` for any other non-string.
      */
     public function requireString(string $key): string
     {
@@ -96,8 +98,8 @@ final class ConfigValidator
     }
 
     /**
-     * A backed-enum value. Absent (null) returns `$default`, or throws when no
-     * default is given. A case of the enum is returned as-is; any other value must
+     * A backed-enum value. Not set (absent, null or blank) returns `$default`, or
+     * throws `missing` when no default is given. A case of the enum is returned as-is; any other value must
      * be one of the backing values — matched exactly and case-sensitively, after
      * coercion to the enum's backing type (see {@see self::toCase()}) — or it
      * THROWS, listing the allowed values. A default never stands in for a typo.
@@ -122,7 +124,7 @@ final class ConfigValidator
 
     /**
      * A string from a fixed vocabulary, for a setting with no enum of its own.
-     * Absent (null) returns `$default`; anything else must be one of `$allowed`
+     * Not set (absent, null or blank) returns `$default`; anything else must be one of `$allowed`
      * (exact, case-sensitive) or it THROWS, listing them — and so does a default
      * outside the vocabulary.
      *
@@ -140,12 +142,11 @@ final class ConfigValidator
     }
 
     /**
-     * A boolean value: falls back to `$default` only when absent (null), and
-     * THROWS when present but unparseable. The vocabulary is PHP's `filter_var`
-     * boolean: `true`/`1`/`on`/`yes` and `false`/`0`/`off`/`no`/`''`,
-     * case-insensitive and trimmed. A typo such as `ALLOW_X=disabled` therefore
-     * fails loudly instead of silently reading as the default; the message names
-     * the key, the offending value and the accepted spellings.
+     * A boolean value: `true`/`1`/`on`/`yes` or `false`/`0`/`off`/`no`,
+     * case-insensitive and trimmed. Absent, null or blank (`''`, whitespace — a
+     * host's `KEY=`) is not set and returns `$default`; anything else THROWS, so a
+     * typo such as `ALLOW_X=disabled` fails loudly instead of silently reading as
+     * the default. The message names the key, the value and the accepted spellings.
      */
     public function boolean(string $key, bool $default = false): bool
     {
@@ -216,9 +217,15 @@ final class ConfigValidator
         return is_int($integer) ? $integer : null;
     }
 
+    /**
+     * The raw value at `$key`, with a blank string (`''` or whitespace only — what a
+     * host's `KEY=` line yields) read as null: not set, exactly like an absent key.
+     */
     private function read(string $key): mixed
     {
-        return $this->config === null ? config($key) : Arr::get($this->config, $key);
+        $value = $this->config === null ? config($key) : Arr::get($this->config, $key);
+
+        return is_string($value) && trim($value) === '' ? null : $value;
     }
 
     /**

@@ -17,7 +17,7 @@ final class ModelResolver
 {
     /**
      * The model class configured at `$key`, or `$default` only when the key is
-     * absent (null). The class must exist, be an Eloquent model, and be `$base`
+     * not set (absent, null or blank — `''` or whitespace). The class must exist, be an Eloquent model, and be `$base`
      * or a subclass of it — `$base` defaulting to `$default` (the packaged model a
      * host extends), else to {@see Model}. Anything else THROWS naming the key;
      * a wrong class never silently falls back to the packaged one. Pass
@@ -35,7 +35,13 @@ final class ModelResolver
     public static function for(string $key, ?string $default = null, ?string $base = null): string
     {
         $base ??= $default ?? Model::class;
-        $value = config($key) ?? $default;
+        $value = config($key);
+
+        if (is_string($value) && trim($value) === '') {
+            $value = null;
+        }
+
+        $value ??= $default;
 
         if (! is_string($value) || ! is_subclass_of($value, Model::class) || ! is_a($value, $base, true)) {
             throw InvalidConfigurationException::notAModel($key, $value, $base);

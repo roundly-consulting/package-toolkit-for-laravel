@@ -44,6 +44,19 @@ it('falls back to the default only when the key is absent or null', function ():
         ->and(KeyType::fromConfig('toolbox.key_type', KeyType::Uuid))->toBe(KeyType::Uuid);
 });
 
+it('reads a blank value as not set, so the default applies', function (string $blank): void {
+    config()->set('toolbox.key_type', $blank);
+
+    expect(KeyType::fromConfig('toolbox.key_type'))->toBe(KeyType::BigInt)
+        ->and(KeyType::fromConfig('toolbox.key_type', KeyType::Ulid))->toBe(KeyType::Ulid);
+})->with([
+    'empty' => [''],
+    'spaces' => ['   '],
+    'a tab' => ["\t"],
+    'a newline' => ["\n"],
+    'mixed whitespace' => [" \t\r\n "],
+]);
+
 it('honours a KeyType case written straight into config', function (KeyType $type): void {
     // `'key_type' => KeyType::Uuid` in a host's config file must not silently
     // become bigint columns.
@@ -62,7 +75,6 @@ it('THROWS on a present value that names no key type instead of reading the defa
 })->with([
     'a typo' => ['uiid', 'uiid'],
     'id is not a bigint synonym' => ['id', 'id'],
-    'an empty string' => ['', "''"],
     'an integer' => [1, '1'],
     'false' => [false, 'false'],
     'an array' => [['uuid'], 'array'],

@@ -45,15 +45,15 @@ function gatedRouteIsRegistered(): bool
 
 it('skips the route for an env-style string that parses as false', function (mixed $configured): void {
     expect(bootsGatedRoute($configured))->toBeFalse();
-})->with(['off', '0', 'no', 'false', 'OFF', 'No', ' no ', "false\n", '', 0, false]);
+})->with(['off', '0', 'no', 'false', 'OFF', 'No', ' no ', "false\n", 0, false]);
 
 it('loads the route for an env-style string that parses as true', function (mixed $configured): void {
     expect(bootsGatedRoute($configured))->toBeTrue();
 })->with(['1', 'on', 'yes', 'true', 'ON', 'Yes', ' on ', "true\n", 1, true]);
 
-it('loads the route when the switch is absent or null', function (mixed $configured): void {
+it('loads the route when the switch is absent, null or blank (not set means the default)', function (mixed $configured): void {
     expect(bootsGatedRoute($configured))->toBeTrue();
-})->with(['__absent__', null]);
+})->with(['__absent__', null, '', '   ', "\t", "\n"]);
 
 it('refuses to boot on an unparseable route switch instead of loading the routes', function (mixed $configured, string $given): void {
     try {
