@@ -6,12 +6,25 @@ All notable changes to `package-toolkit-for-laravel` are documented in this file
 
 ## Unreleased
 
+## 1.1.0 - 2026-10-05
+
+### Added
+
+- `MigrationPublisher::nextTimestamp()` hands out publish timestamps from one process-wide
+  cursor, the same one the base provider uses, so a custom publish command's migrations order
+  after everything else published in the same run. `MigrationPublisher::resetTimestamps()`
+  restarts it for test suites that pin publish timestamps.
+
 ### Changed
 
 - A published route file now replaces the package's: once a host has run
   `vendor:publish --tag=<pkg>-routes`, the published `routes/<file>` loads instead of the
   package's file, so edits to it take effect. If you `require` that copy from
   `routes/web.php` (or another route file), remove the line, or its routes register twice.
+- Maintenance: `composer.json` `homepage` and `support.docs` point at the package's
+  documentation page.
+- Documentation: the README hero image uses an absolute URL, so it renders on Packagist and
+  other sites.
 
 ### Fixed
 
@@ -25,9 +38,7 @@ All notable changes to `package-toolkit-for-laravel` are documented in this file
   crashes. Config naming the contract itself, or an abstract class, throws
   `InvalidConfigurationException`, and a class contract can default to itself.
 - Packages published in one `vendor:publish` run no longer share migration timestamps, so
-  their migrations run in publish order instead of interleaving by name. The timestamps come
-  from `MigrationPublisher::nextTimestamp()`; `MigrationPublisher::resetTimestamps()` restarts
-  it in tests.
+  their migrations run in publish order instead of interleaving by name.
 
 ## 1.0.0 - 2026-10-03
 
