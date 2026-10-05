@@ -6,6 +6,29 @@ All notable changes to `package-toolkit-for-laravel` are documented in this file
 
 ## Unreleased
 
+### Changed
+
+- A published route file now replaces the package's: once a host has run
+  `vendor:publish --tag=<pkg>-routes`, the published `routes/<file>` loads instead of the
+  package's file, so edits to it take effect. If you `require` that copy from
+  `routes/web.php` (or another route file), remove the line, or its routes register twice.
+
+### Fixed
+
+- `morphKey()` and `polymorphicSubject()` with `KeyType::BigInt` always build a numeric `*_id`
+  column. A host that called `Schema::morphUsingUuids()` / `morphUsingUlids()` used to get a
+  uuid/ulid column that refused the package's integer keys. Without those calls the generated
+  schema is unchanged.
+- `whereLikeEscaped()` on PostgreSQL casts the column to `text`, as Laravel's own `like` does,
+  so searching a uuid or integer column no longer throws `SQLSTATE[42883]`.
+- `bindFromConfig()` with a class (not interface) contract no longer recurses until PHP
+  crashes. Config naming the contract itself, or an abstract class, throws
+  `InvalidConfigurationException`, and a class contract can default to itself.
+- Packages published in one `vendor:publish` run no longer share migration timestamps, so
+  their migrations run in publish order instead of interleaving by name. The timestamps come
+  from `MigrationPublisher::nextTimestamp()`; `MigrationPublisher::resetTimestamps()` restarts
+  it in tests.
+
 ## 1.0.0 - 2026-10-03
 
 Initial public release.
