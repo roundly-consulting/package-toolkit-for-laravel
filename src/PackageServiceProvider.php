@@ -7,7 +7,6 @@ namespace RoundlyConsulting\PackageToolkit;
 use Illuminate\Container\Container;
 use Illuminate\Foundation\AliasLoader;
 use Illuminate\Foundation\Console\AboutCommand;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\ServiceProvider;
 use ReflectionClass;
 use RoundlyConsulting\PackageToolkit\Declarations\FacadeAliasDeclaration;
@@ -204,9 +203,7 @@ abstract class PackageServiceProvider extends ServiceProvider
      */
     protected function publishPackageMigrations(): void
     {
-        $timestamp = Carbon::now();
         $directory = database_path('migrations');
-        $offset = 0;
 
         $sources = $this->package->hasMigrations ? $this->package->migrationFiles() : [];
 
@@ -215,7 +212,7 @@ abstract class PackageServiceProvider extends ServiceProvider
                 $file => MigrationPublisher::destination(
                     $file,
                     $directory,
-                    $timestamp->copy()->addSeconds($offset++),
+                    MigrationPublisher::nextTimestamp(),
                 ),
             ], $this->package->name.'-migrations');
         }
@@ -227,7 +224,7 @@ abstract class PackageServiceProvider extends ServiceProvider
                 $source => MigrationPublisher::destination(
                     $source,
                     $directory,
-                    $timestamp->copy()->addSeconds($offset++),
+                    MigrationPublisher::nextTimestamp(),
                 ),
             ], $stub->tag);
         }

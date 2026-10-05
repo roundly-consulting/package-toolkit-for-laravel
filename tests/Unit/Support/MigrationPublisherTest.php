@@ -117,3 +117,32 @@ it('resolves a destination when the host migrations directory does not exist yet
     expect(MigrationPublisher::destination($this->source, $this->migrations.'/nope/', Carbon::parse('2026-07-14 20:15:30')))
         ->toBe($this->migrations.'/nope/2026_07_14_201530_create_widgets_table.php');
 });
+
+it('hands out one timestamp per file, a second apart, while the clock stands still', function (): void {
+    Carbon::setTestNow('2026-10-05 20:00:00');
+
+    expect([
+        MigrationPublisher::nextTimestamp()->format('Y_m_d_His'),
+        MigrationPublisher::nextTimestamp()->format('Y_m_d_His'),
+        MigrationPublisher::nextTimestamp()->format('Y_m_d_His'),
+    ])->toBe(['2026_10_05_200000', '2026_10_05_200001', '2026_10_05_200002']);
+});
+
+it('starts again from the current time once the clock has passed the cursor', function (): void {
+    Carbon::setTestNow('2026-10-05 20:00:00');
+    MigrationPublisher::nextTimestamp();
+
+    Carbon::setTestNow('2026-10-05 21:30:00.750');
+
+    expect(MigrationPublisher::nextTimestamp()->format('Y_m_d_His.u'))->toBe('2026_10_05_213000.000000');
+});
+
+it('forgets the cursor on reset', function (): void {
+    Carbon::setTestNow('2026-10-05 20:00:00');
+    MigrationPublisher::nextTimestamp();
+    MigrationPublisher::nextTimestamp();
+
+    MigrationPublisher::resetTimestamps();
+
+    expect(MigrationPublisher::nextTimestamp()->format('Y_m_d_His'))->toBe('2026_10_05_200000');
+});

@@ -3,6 +3,9 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\ServiceProvider;
+use RoundlyConsulting\PackageToolkit\Support\MigrationPublisher;
+use RoundlyConsulting\PackageToolkit\Tests\Fixtures\Gearbox\GearboxServiceProvider;
 use RoundlyConsulting\PackageToolkit\Tests\Fixtures\Toolbox\ToolboxServiceProvider;
 
 /**
@@ -87,4 +90,34 @@ it('republishes an unchanged migration in place rather than duplicating it', fun
     ($this->publish)(force: true);
 
     expect(($this->gizmoMigrations)())->toBe($first)->toHaveCount(1);
+});
+
+it('allocates unique, increasing timestamps across providers in one run', function (): void {
+    $this->freezeSecond();
+    MigrationPublisher::resetTimestamps();
+
+    // One `vendor:publish` run boots every provider at the same instant.
+    ($this->bootToolbox)();
+
+    $gearbox = new GearboxServiceProvider($this->app);
+    $gearbox->register();
+    $gearbox->boot();
+
+    $stamps = array_map(
+        static fn (string $destination): string => substr(basename($destination), 0, 17),
+        [
+            ...array_values(ServiceProvider::pathsToPublish(ToolboxServiceProvider::class, 'toolbox-migrations')),
+            ...array_values(ServiceProvider::pathsToPublish(GearboxServiceProvider::class, 'gearbox-migrations')),
+        ],
+    );
+
+    $ordered = $stamps;
+    sort($ordered);
+
+    // Shared prefixes would make the migrator order the two packages by name and
+    // interleave them; one cursor keeps every file in boot order.
+    expect($stamps)->toHaveCount(5)
+        ->and(array_unique($stamps))->toHaveCount(5)
+        ->and($stamps)->toBe($ordered)
+        ->and($stamps[0])->toBe(now()->format('Y_m_d_His'));
 });

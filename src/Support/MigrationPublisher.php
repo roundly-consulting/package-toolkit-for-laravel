@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace RoundlyConsulting\PackageToolkit\Support;
 
 use Carbon\CarbonInterface;
+use Illuminate\Support\Carbon;
 
 /**
  * Resolves where a package migration publishes to in the host application.
@@ -26,6 +27,38 @@ use Carbon\CarbonInterface;
 final class MigrationPublisher
 {
     private const TIMESTAMP_PREFIX = '/^\d{4}_\d{2}_\d{2}_\d{6}_/';
+
+    /**
+     * The last timestamp {@see self::nextTimestamp()} handed out in this process.
+     */
+    private static ?CarbonInterface $cursor = null;
+
+    /**
+     * The publish timestamp for the next migration file: the current second, or
+     * one second past the last timestamp handed out in this process when that is
+     * later. Every provider draws from this one cursor, so the packages published
+     * in one `vendor:publish` run never share a prefix, and the migrator (which
+     * orders by filename) runs their files in publish order instead of by name.
+     */
+    public static function nextTimestamp(): CarbonInterface
+    {
+        $now = Carbon::now()->startOfSecond();
+
+        self::$cursor = self::$cursor !== null && $now->lessThanOrEqualTo(self::$cursor)
+            ? self::$cursor->copy()->addSecond()
+            : $now;
+
+        return self::$cursor->copy();
+    }
+
+    /**
+     * Forget the cursor, so the next timestamp is the current second again. For
+     * test suites that pin publish timestamps.
+     */
+    public static function resetTimestamps(): void
+    {
+        self::$cursor = null;
+    }
 
     /**
      * The migration name a package source file publishes under: its base name

@@ -7,11 +7,24 @@ namespace RoundlyConsulting\PackageToolkit\Tests;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
+use RoundlyConsulting\PackageToolkit\Support\MigrationPublisher;
 use RoundlyConsulting\PackageToolkit\Tests\Fixtures\Toolbox\ToolboxServiceProvider;
 use RoundlyConsulting\Testing\PackageTestCase;
 
 abstract class TestCase extends PackageTestCase
 {
+    /**
+     * The migration timestamp cursor is process-wide, and every test boots the providers
+     * again: without a reset each test's publish destinations start where the last test's
+     * ended, not at the current time.
+     */
+    protected function setUp(): void
+    {
+        MigrationPublisher::resetTimestamps();
+
+        parent::setUp();
+    }
+
     /**
      * The toolkit ships no service provider of its own — it ships the *base* every other
      * package's provider extends. Toolbox is the fixture consumer that exercises the
