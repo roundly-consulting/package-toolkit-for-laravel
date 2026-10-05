@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use RoundlyConsulting\PackageToolkit\Tests\Models\Article;
 
 beforeEach(function (): void {
@@ -11,6 +13,10 @@ beforeEach(function (): void {
         ['title' => 'he%lo there'],
         ['title' => 'completely different'],
     ]);
+});
+
+afterEach(function (): void {
+    Schema::dropIfExists('lookups');
 });
 
 it('registers the query builder macro', function (): void {
@@ -88,4 +94,30 @@ it('falls back to like on a connection that cannot report its driver', function 
 
     expect($query->from('articles')->whereLikeEscaped('title', 'x')->toSql())
         ->toBe('select * from "articles" where "title" like ? escape ?');
+});
+
+it('casts the column to text on postgres, as Laravel\'s own like does', function (): void {
+    $connection = new Illuminate\Database\PostgresConnection(new PDO('sqlite::memory:'), '', '', ['driver' => 'pgsql', 'name' => 'pgsql']);
+
+    $query = $connection->query()->from('articles')->whereLikeEscaped('title', '50%_off');
+
+    // Postgres has no `uuid ~~* text` or `bigint ~~* text` operator: without the cast a
+    // search on a uuid or integer column throws SQLSTATE 42883 on a request path.
+    expect($query->toSql())->toBe('select * from "articles" where "title"::text ilike ? escape ?')
+        ->and($query->getBindings())->toBe(['%50\\%\\_off%', '\\']);
+});
+
+it('searches a uuid and an integer column on the active driver', function (): void {
+    Schema::create('lookups', function (Blueprint $table): void {
+        $table->id();
+        $table->uuid('reference');
+    });
+
+    DB::table('lookups')->insert([
+        ['id' => 1234, 'reference' => '9b2c7f4e-0d1a-4c3b-8e5f-6a7b8c9d0e1f'],
+        ['id' => 5678, 'reference' => '1f0e9d8c-7b6a-4f5e-8d3c-2b1a0f9e8d7c'],
+    ]);
+
+    expect(DB::table('lookups')->whereLikeEscaped('reference', '4C3B')->pluck('id')->all())->toEqual([1234])
+        ->and(DB::table('lookups')->whereLikeEscaped('id', '67')->pluck('id')->all())->toEqual([5678]);
 });

@@ -19,7 +19,9 @@ final class LikeSearch
      * User wildcards are escaped and matched with an explicit `ESCAPE '\'`
      * clause so `%`/`_` stay literal on every driver — SQLite has no default
      * escape character, so a plain `LIKE` would leave escaped wildcards live.
-     * Postgres uses `ILIKE`; every other driver a `LIKE`. The column identifier
+     * Postgres uses `ILIKE` on the column cast to `::text` (as Laravel's own
+     * grammar does), so a uuid or integer column is searchable too; every other
+     * driver a `LIKE`. The column identifier
      * is developer-supplied (grammar-wrapped); the needle and escape char are
      * bound — no user input ever reaches an identifier position.
      *
@@ -32,7 +34,8 @@ final class LikeSearch
         $connection = $query->getConnection();
         $driver = $connection instanceof Connection ? $connection->getDriverName() : '';
 
-        $operator = (DatabaseDriver::tryFrom($driver)?->isPgsql() ?? false) ? 'ilike' : 'like';
+        $pgsql = DatabaseDriver::tryFrom($driver)?->isPgsql() ?? false;
+        $operator = $pgsql ? 'ilike' : 'like';
 
         $needle = LikeEscaper::escape($term);
 
@@ -43,6 +46,12 @@ final class LikeSearch
         }
 
         $wrapped = $query->getGrammar()->wrap($column);
+
+        // Postgres has no `uuid ~~* text` (or bigint) operator, so a bare uuid or
+        // integer column would throw SQLSTATE 42883 instead of matching.
+        if ($pgsql) {
+            $wrapped .= '::text';
+        }
 
         $expression = new RawExpression("{$wrapped} {$operator} ? escape ?");
 
