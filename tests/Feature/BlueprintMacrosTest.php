@@ -3,10 +3,14 @@
 declare(strict_types=1);
 
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Database\Schema\Builder;
 use Illuminate\Support\Facades\Schema;
 use RoundlyConsulting\PackageToolkit\Enums\KeyType;
 
 afterEach(function (): void {
+    // A host-wide morph default leaking out of one test would retype every later morph column.
+    Schema::defaultMorphKeyType('int');
+
     foreach (['ok_bigint', 'ok_uuid', 'ok_ulid', 'ok_morph', 'ok_audit', 'ok_subject'] as $table) {
         Schema::dropIfExists($table);
     }
@@ -106,3 +110,60 @@ it('adds a polymorphic subject column pair', function (): void {
     expect(Schema::hasColumn('ok_subject', 'owner_type'))->toBeTrue()
         ->and(Schema::getColumnType('ok_subject', 'owner_id'))->toBe(expectedKeyColumnType(KeyType::Ulid));
 });
+
+it('keeps a bigint morph key numeric after the host switches its morph default', function (string $hostDefault, bool $nullable): void {
+    match ($hostDefault) {
+        'uuid' => Schema::morphUsingUuids(),
+        'ulid' => Schema::morphUsingUlids(),
+    };
+
+    try {
+        Schema::create('ok_morph', function (Blueprint $table) use ($nullable): void {
+            $table->id();
+            $table->morphKey('subject', KeyType::BigInt, nullable: $nullable);
+            $table->polymorphicSubject('target', KeyType::BigInt, nullable: $nullable);
+        });
+    } finally {
+        Schema::defaultMorphKeyType('int');
+    }
+
+    // The package's key type decides the id column, not the host's `morphUsingUuids()`: a
+    // uuid `subject_id` would refuse every integer key the package writes into it.
+    expect(Schema::getColumnType('ok_morph', 'subject_id'))->toBe(expectedKeyColumnType(KeyType::BigInt))
+        ->and(Schema::getColumnType('ok_morph', 'target_id'))->toBe(expectedKeyColumnType(KeyType::BigInt));
+})->with([
+    'Schema::morphUsingUuids()' => ['uuid'],
+    'Schema::morphUsingUlids()' => ['ulid'],
+])->with([
+    'required' => [false],
+    'nullable' => [true],
+]);
+
+/**
+ * The DDL a `Schema::create()` of a one-column-pair table compiles to on the active
+ * connection, without running it.
+ *
+ * @return list<string>
+ */
+function compiledMorphTable(Closure $columns): array
+{
+    $blueprint = new Blueprint(Schema::getConnection(), 'ok_morph', $columns);
+    $blueprint->create();
+
+    return $blueprint->toSql();
+}
+
+it('compiles a bigint morph key to exactly the DDL of Laravel\'s default morphs', function (bool $nullable, string $macro): void {
+    // The macro used to call `morphs()` / `nullableMorphs()`. Under Laravel's default morph
+    // key type those are the numeric pair, so the 30 consumer migrations built on this
+    // macro must compile to the same statements, byte for byte, after the fix.
+    expect(Builder::$defaultMorphKeyType)->toBe('int');
+
+    $package = compiledMorphTable(fn (Blueprint $table) => $table->{$macro}('subject', KeyType::BigInt, nullable: $nullable));
+    $laravel = compiledMorphTable(fn (Blueprint $table) => $nullable ? $table->nullableMorphs('subject') : $table->morphs('subject'));
+
+    expect($package)->not->toBeEmpty()->toBe($laravel);
+})->with([
+    'required' => [false],
+    'nullable' => [true],
+])->with(['morphKey', 'polymorphicSubject']);

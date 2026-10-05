@@ -40,7 +40,10 @@ final class BlueprintMacros
 
     /**
      * A polymorphic `<name>_type` / `<name>_id` column pair (with composite
-     * index) whose id column matches the given key type.
+     * index) whose id column matches the given key type. `KeyType::BigInt`
+     * always emits the numeric pair: Laravel's `morphs()` follows a host-wide
+     * `Schema::morphUsingUuids()` / `morphUsingUlids()`, which would give a
+     * bigint-keyed package a uuid/ulid id column it cannot write to.
      */
     public static function morphKey(Blueprint $table, string $name, KeyType $type, bool $nullable): void
     {
@@ -49,8 +52,8 @@ final class BlueprintMacros
             $type === KeyType::Uuid => $table->uuidMorphs($name),
             $type === KeyType::Ulid && $nullable => $table->nullableUlidMorphs($name),
             $type === KeyType::Ulid => $table->ulidMorphs($name),
-            $nullable => $table->nullableMorphs($name),
-            default => $table->morphs($name),
+            $nullable => $table->nullableNumericMorphs($name),
+            default => $table->numericMorphs($name),
         };
     }
 
