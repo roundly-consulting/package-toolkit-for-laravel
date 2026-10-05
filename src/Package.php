@@ -144,8 +144,10 @@ final class Package
 
     /**
      * Load a route file (optionally gated behind a boolean config key) and
-     * publish it under the `<name>-routes` tag. The switch is read strictly at
-     * boot, via {@see Config::boolean()} with a `true` default: `false`,
+     * publish it under the `<name>-routes` tag. Once a host has published it,
+     * the published `routes/<file>` loads instead of the package's file, so the
+     * host's edits take effect (the switch gates either one). The switch is
+     * read strictly at boot, via {@see Config::boolean()} with a `true` default: `false`,
      * `0`, `'0'`, `'false'`, `'off'` and `'no'` skip the file; `true`, `1`,
      * `'1'`, `'true'`, `'on'`, `'yes'`, or a value that is not set (absent, `null`,
      * blank `''` / whitespace) load it; anything

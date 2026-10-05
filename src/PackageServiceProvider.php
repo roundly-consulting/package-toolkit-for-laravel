@@ -130,7 +130,11 @@ abstract class PackageServiceProvider extends ServiceProvider
                 continue;
             }
 
-            $this->loadRoutesFrom($this->package->routesPath($route->file));
+            // A host that published the route file edits that copy, so it replaces the
+            // package's file rather than registering beside it.
+            $published = base_path('routes/'.$route->file);
+
+            $this->loadRoutesFrom(is_file($published) ? $published : $this->package->routesPath($route->file));
         }
 
         $this->registerAboutContributions();
