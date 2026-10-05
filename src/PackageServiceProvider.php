@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\PackageToolkit;
 
+use Illuminate\Container\Container;
 use Illuminate\Foundation\AliasLoader;
 use Illuminate\Foundation\Console\AboutCommand;
 use Illuminate\Support\Carbon;
@@ -236,29 +237,44 @@ abstract class PackageServiceProvider extends ServiceProvider
      * Bind a contract to the implementation named by a config key. Call from an
      * overridden `register()`. Config is read when the contract is resolved: an
      * absent, null or blank value binds `$default`; any other value must name an
-     * existing class that is a `$contract`, or resolving THROWS
+     * existing, instantiable class that is a `$contract`, or resolving THROWS
      * {@see InvalidConfigurationException} (so `false`, `''`, a missing class, a
-     * class of the wrong type, or the contract itself never resolve silently).
+     * class of the wrong type, an abstract class, or the contract itself never
+     * resolve silently). A class contract may name itself as `$default`.
      *
      * @param  class-string  $contract
      * @param  class-string  $default
      */
     protected function bindFromConfig(string $contract, string $configKey, string $default): void
     {
-        $this->app->bind($contract, function () use ($contract, $configKey, $default): mixed {
+        $this->app->bind($contract, function (Container $container) use ($contract, $configKey, $default): mixed {
             $configured = config($configKey);
 
             // Blank (`''`, whitespace — a host's `KEY=`) is not set, exactly like absent.
             if ($configured === null || (is_string($configured) && trim($configured) === '')) {
-                return $this->app->make($default);
+                // make() on the contract itself would re-enter this very binding.
+                return self::namesClass($default, $contract) ? $container->build($default) : $container->make($default);
             }
 
-            if (! is_string($configured) || ! class_exists($configured) || ! is_a($configured, $contract, true)) {
+            if (! is_string($configured)
+                || ! class_exists($configured)
+                || ! is_a($configured, $contract, true)
+                || self::namesClass($configured, $contract)
+                || ! (new ReflectionClass($configured))->isInstantiable()) {
                 throw InvalidConfigurationException::notAnImplementation($configKey, $contract, $configured);
             }
 
-            return $this->app->make($configured);
+            return $container->make($configured);
         });
+    }
+
+    /**
+     * Whether `$name` spells the class `$class` (class names are case-insensitive,
+     * and a leading backslash is optional).
+     */
+    private static function namesClass(string $name, string $class): bool
+    {
+        return strcasecmp(ltrim($name, '\\'), ltrim($class, '\\')) === 0;
     }
 
     /**
