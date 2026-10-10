@@ -118,7 +118,10 @@ it('resolves a destination when the host migrations directory does not exist yet
         ->toBe($this->migrations.'/nope/2026_07_14_201530_create_widgets_table.php');
 });
 
+// Booting the providers already drew a timestamp from the real clock; a pinned
+// clock behind it would only ever see that cursor plus one second.
 it('hands out one timestamp per file, a second apart, while the clock stands still', function (): void {
+    MigrationPublisher::resetTimestamps();
     Carbon::setTestNow('2026-10-05 20:00:00');
 
     expect([
@@ -129,6 +132,7 @@ it('hands out one timestamp per file, a second apart, while the clock stands sti
 });
 
 it('starts again from the current time once the clock has passed the cursor', function (): void {
+    MigrationPublisher::resetTimestamps();
     Carbon::setTestNow('2026-10-05 20:00:00');
     MigrationPublisher::nextTimestamp();
 
