@@ -8,6 +8,7 @@ use BackedEnum;
 use Illuminate\Database\Eloquent\Model;
 use RoundlyConsulting\PackageToolkit\Enums\KeyType;
 use SensitiveParameter;
+use SensitiveParameterValue;
 
 /**
  * Thrown when a package reads a configuration value that is missing, of the
@@ -16,7 +17,9 @@ use SensitiveParameter;
  * Every "wrong value" message has one shape — `Configuration value [key] must
  * be …, [given] given.` (`must contain …` for a list item) — where `given` is the
  * offending value (or list item) as written (`''` when empty), a scalar as its
- * PHP literal, or anything else by its type.
+ * PHP literal, or anything else by its type. A value wrapped in
+ * {@see SensitiveParameterValue} is described by its type only (`[int] given.`),
+ * which is how the secret readers keep a misconfigured secret out of the message.
  *
  * Every value parameter is `#[SensitiveParameter]`: the message is the one place
  * a value shows, never the arguments of a stack frame, which error trackers and
@@ -85,7 +88,7 @@ final class InvalidConfigurationException extends PackageToolkitException
         return self::must($key, 'contain only string items', $item);
     }
 
-    public static function notAValidListItem(string $key, #[SensitiveParameter] string $item): self
+    public static function notAValidListItem(string $key, #[SensitiveParameter] string|SensitiveParameterValue $item): self
     {
         return self::must($key, 'contain only valid items', $item);
     }
@@ -133,11 +136,14 @@ final class InvalidConfigurationException extends PackageToolkitException
 
     /**
      * How an offending value reads in a message: a string as written (`''` when
-     * empty), a scalar as its PHP literal, anything else by its type.
+     * empty), a scalar as its PHP literal, anything else by its type — and a
+     * value wrapped in {@see SensitiveParameterValue} by the type of what it
+     * wraps, never its content.
      */
     private static function describe(#[SensitiveParameter] mixed $value): string
     {
         return match (true) {
+            $value instanceof SensitiveParameterValue => get_debug_type($value->getValue()),
             $value === '' => "''",
             is_string($value) => $value,
             is_int($value), is_float($value), is_bool($value) => var_export($value, true),

@@ -85,6 +85,40 @@ final class Config
     }
 
     /**
+     * An optional secret (an API key, a signing secret, a password): null when the
+     * key is not set (absent, null or blank); a present string is returned as
+     * given, never trimmed; anything else throws, describing the value by its
+     * type only (`[int] given.`) — never the value itself.
+     */
+    public static function secret(string $key): ?string
+    {
+        return ConfigValidator::forRepository()->secret($key);
+    }
+
+    /**
+     * A required secret: as {@see self::secret()}, but a key that is not set
+     * throws `missing`.
+     */
+    public static function requireSecret(string $key): string
+    {
+        return ConfigValidator::forRepository()->requireSecret($key);
+    }
+
+    /**
+     * A list of secrets (a key ring), parsed like {@see self::list()} but with no
+     * default — not set, or no items, is `[]` — and every failure describing the
+     * value or item by its type only. Give `$each`'s parameter
+     * `#[SensitiveParameter]` so a closure that throws cannot leak an item.
+     *
+     * @param  (Closure(string): bool)|null  $each
+     * @return list<string>
+     */
+    public static function secretList(string $key, ?Closure $each = null): array
+    {
+        return ConfigValidator::forRepository()->secretList($key, $each);
+    }
+
+    /**
      * A backed-enum config value: `$default` only when the key is not set (absent,
      * null or blank)
      * — or a throw when no default is given. A case, or its exact

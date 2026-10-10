@@ -6,6 +6,16 @@ All notable changes to `package-toolkit-for-laravel` are documented in this file
 
 ## Unreleased
 
+### Added
+
+- `Config::secret()`, `Config::requireSecret()` and `Config::secretList()` (and the same three
+  on `ConfigValidator`) read API keys, signing secrets and key rings. They parse like
+  `string()`, `requireString()` and `list()` (`secret()` returns `null` and `secretList()` `[]`
+  when the key is not set), but a misconfigured value or list item is described by its type
+  only (`[int] given.`). The value never shows in the message, the trace or a chained
+  exception. Every `InvalidConfigurationException` factory describes a value wrapped in
+  `SensitiveParameterValue` the same way.
+
 ### Security
 
 - A configuration value no longer shows in the arguments of an exception's stack frames

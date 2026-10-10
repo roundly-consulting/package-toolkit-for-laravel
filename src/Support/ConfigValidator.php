@@ -10,6 +10,7 @@ use Illuminate\Support\Arr;
 use ReflectionEnum;
 use RoundlyConsulting\PackageToolkit\Exceptions\InvalidConfigurationException;
 use SensitiveParameter;
+use SensitiveParameterValue;
 use Throwable;
 
 /**
@@ -168,26 +169,53 @@ final class ConfigValidator
      */
     public function list(string $key, #[SensitiveParameter] array $default, ?Closure $each = null): array
     {
-        $raw = $this->read($key);
+        return $this->readList($key, $default, $each, secret: false);
+    }
 
-        $items = match (true) {
-            $raw === null => [],
-            is_string($raw) => $this->toList($key, explode(',', $raw)),
-            is_array($raw) => $this->toList($key, $raw),
-            default => throw $this->fail(InvalidConfigurationException::notAList($key, $raw)),
-        };
+    /**
+     * An optional secret — an API key, a signing secret, a password. Not set
+     * (absent, null or blank) returns null; a present string is returned AS
+     * GIVEN, never trimmed. Anything else THROWS `notAString` — and, unlike
+     * {@see self::string()}, the message describes the value by its TYPE only
+     * (`[int] given.`), so a misconfigured secret reaches no message, no trace and
+     * no log line.
+     */
+    public function secret(string $key): ?string
+    {
+        $value = $this->read($key);
 
-        if ($items === []) {
-            $items = $this->toList($key, $default);
+        if ($value === null) {
+            return null;
         }
 
-        foreach ($items as $item) {
-            if ($each !== null && $each($item) !== true) {
-                throw $this->fail(InvalidConfigurationException::notAValidListItem($key, $item));
-            }
-        }
+        return is_string($value)
+            ? $value
+            : throw $this->fail(InvalidConfigurationException::notAString($key, new SensitiveParameterValue($value)));
+    }
 
-        return $items;
+    /**
+     * A required secret: {@see self::secret()}, but a key that is not set THROWS
+     * `missing`, as {@see self::requireString()} does.
+     */
+    public function requireSecret(string $key): string
+    {
+        return $this->secret($key) ?? throw $this->fail(InvalidConfigurationException::missing($key));
+    }
+
+    /**
+     * A list of secrets — a key ring, the current signing key plus the ones it
+     * replaced. Parsed exactly like {@see self::list()} (a config array or an env
+     * comma list; items trimmed, empty ones dropped, re-indexed), but with no
+     * default: not set, or no items, returns `[]`. Every failure describes the
+     * value or item by its TYPE only. `$each` sees every item: give its parameter
+     * `#[SensitiveParameter]`, so a closure that throws cannot leak one either.
+     *
+     * @param  (Closure(string): bool)|null  $each
+     * @return list<string>
+     */
+    public function secretList(string $key, ?Closure $each = null): array
+    {
+        return $this->readList($key, [], $each, secret: true);
     }
 
     /**
@@ -251,6 +279,47 @@ final class ConfigValidator
 
         return filter_var($value, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE)
             ?? throw $this->fail(InvalidConfigurationException::notABoolean($key, $value));
+    }
+
+    /**
+     * The list at `$key` (see {@see self::list()}); a `$secret` list describes
+     * whatever it rejects by type only.
+     *
+     * @param  array<string>  $default
+     * @param  (Closure(string): bool)|null  $each
+     * @return list<string>
+     */
+    private function readList(string $key, #[SensitiveParameter] array $default, ?Closure $each, bool $secret): array
+    {
+        $raw = $this->read($key);
+
+        $items = match (true) {
+            $raw === null => [],
+            is_string($raw) => $this->toList($key, explode(',', $raw), $secret),
+            is_array($raw) => $this->toList($key, $raw, $secret),
+            default => throw $this->fail(InvalidConfigurationException::notAList($key, self::given($raw, $secret))),
+        };
+
+        if ($items === []) {
+            $items = $this->toList($key, $default, $secret);
+        }
+
+        foreach ($items as $item) {
+            if ($each !== null && $each($item) !== true) {
+                throw $this->fail(InvalidConfigurationException::notAValidListItem($key, self::given($item, $secret)));
+            }
+        }
+
+        return $items;
+    }
+
+    /**
+     * What a failure message describes: a secret by its type only, anything else
+     * as it is.
+     */
+    private static function given(#[SensitiveParameter] mixed $value, bool $secret): mixed
+    {
+        return $secret ? new SensitiveParameterValue($value) : $value;
     }
 
     /**
@@ -331,18 +400,19 @@ final class ConfigValidator
 
     /**
      * The items of a config list, trimmed, with empty ones dropped and the keys
-     * discarded; throws `notAStringItem` for the first item that is not a string.
+     * discarded; throws `notAStringItem` for the first item that is not a string
+     * (described by type only when `$secret`).
      *
      * @param  array<mixed>  $items
      * @return list<string>
      */
-    private function toList(string $key, #[SensitiveParameter] array $items): array
+    private function toList(string $key, #[SensitiveParameter] array $items, bool $secret): array
     {
         $list = [];
 
         foreach ($items as $item) {
             if (! is_string($item)) {
-                throw $this->fail(InvalidConfigurationException::notAStringItem($key, $item));
+                throw $this->fail(InvalidConfigurationException::notAStringItem($key, self::given($item, $secret)));
             }
 
             if (($item = trim($item)) !== '') {
