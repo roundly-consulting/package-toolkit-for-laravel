@@ -12,5 +12,8 @@
         "ordered_imports": {
             "sort_algorithm": "alpha"
         }
-    }
+    },
+    "notPath": [
+        "src/Concerns/RedactsSensitiveArguments.php"
+    ]
 }

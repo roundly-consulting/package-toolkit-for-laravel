@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use RoundlyConsulting\PackageToolkit\Concerns\RedactsSensitiveArguments;
 use RoundlyConsulting\PackageToolkit\Exceptions\PackageToolkitException;
 use RoundlyConsulting\PackageToolkit\PackageServiceProvider;
 use RoundlyConsulting\Testing\Arch\ArchPresets;
@@ -21,8 +22,15 @@ use RoundlyConsulting\Testing\Arch\ArchPresets;
  *     nothing to read. It would be green on the first run and green forever. jwt and enums
  *     rejected it for the same reason; shops and credits adopted it because they have the
  *     shape it targets — a real model behind a `*_model` key.
+ *
+ * `strictTypes` carries one deliberate exemption, `RedactsSensitiveArguments`. It forwards a
+ * facade call, and Laravel's own `Facade::__callStatic` forwards from a file without strict
+ * types, so `Facade::method(123)` coerces for every caller. Strictness comes from the file the
+ * forwarding call is written in: a strict trait would turn those calls into TypeErrors for
+ * every adopting facade. The parity test in `RedactsSensitiveArgumentsTest` pins the
+ * behaviour, and `pint.json` keeps Pint's `declare_strict_types` rule from re-adding the line.
  */
-ArchPresets::strictTypes('RoundlyConsulting\PackageToolkit');
+ArchPresets::strictTypes('RoundlyConsulting\PackageToolkit', [RedactsSensitiveArguments::class]);
 
 /**
  * Two deliberate extension points are exempt, and they are the toolkit's entire purpose:

@@ -15,6 +15,13 @@ All notable changes to `package-toolkit-for-laravel` are documented in this file
   only (`[int] given.`). The value never shows in the message, the trace or a chained
   exception. Every `InvalidConfigurationException` factory describes a value wrapped in
   `SensitiveParameterValue` the same way.
+- `Concerns\RedactsSensitiveArguments`, a facade trait. Add `use RedactsSensitiveArguments;`
+  to a facade and its own stack frame hides exactly the arguments the root method marks
+  `#[SensitiveParameter]`: positional, named and variadic, also when the root fails to
+  resolve. Harmless arguments stay visible. A stock facade's `__callStatic` frame carries every
+  argument raw, so a secret passed through it reached error trackers that collect frame
+  arguments. Return values, scalar coercion, `swap()` fakes and `shouldReceive()` behave
+  exactly as with Laravel's own facade.
 
 ### Security
 
