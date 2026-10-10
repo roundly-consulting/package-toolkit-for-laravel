@@ -104,6 +104,128 @@ describe('integer', function (): void {
     });
 });
 
+describe('float', function (): void {
+    it('reads an int, a float or a canonical decimal string, always as a float', function (mixed $value, float $expected): void {
+        config()->set('toolbox.rate', $value);
+
+        expect(Config::float('toolbox.rate', 0.5))->toBe($expected)
+            ->and(Config::for(['rate' => $value])->float('rate', 0.5))->toBe($expected);
+    })->with([
+        'a float' => [0.25, 0.25],
+        'a negative float' => [-1.5, -1.5],
+        'an int' => [1, 1.0],
+        'zero' => [0, 0.0],
+        'a decimal string' => ['0.25', 0.25],
+        'a padded string' => [' 1 ', 1.0],
+        'a negative string' => ['-0.5', -0.5],
+        'an integer string' => ['3', 3.0],
+        'a trailing newline' => ["0.75\n", 0.75],
+        'leading zeros' => ['007.50', 7.5],
+    ]);
+
+    it('reads a value that is not set as the default', function (mixed $notSet): void {
+        config()->set('toolbox.rate', $notSet);
+
+        expect(Config::float('toolbox.rate', 0.5))->toBe(0.5)
+            ->and(Config::float('toolbox.never_set', 0.1))->toBe(0.1)
+            ->and(Config::for(['rate' => $notSet])->float('rate', 0.2))->toBe(0.2)
+            ->and(Config::for([])->float('rate', 0.3, min: 0, max: 1))->toBe(0.3);
+    })->with([
+        'null' => [null],
+        'empty' => [''],
+        'spaces' => ['   '],
+        'a tab' => ["\t"],
+        'mixed whitespace' => [" \t\r\n "],
+    ]);
+
+    it('THROWS on anything but a decimal number instead of reading the default', function (mixed $value, string $given): void {
+        config()->set('toolbox.rate', $value);
+
+        expect(fn (): float => Config::float('toolbox.rate', 0.5))->toThrow(
+            InvalidConfigurationException::class,
+            "Configuration value [toolbox.rate] must be a decimal number, [{$given}] given.",
+        );
+    })->with([
+        'a word' => ['abc', 'abc'],
+        'an exponent' => ['1e3', '1e3'],
+        'an upper-case exponent' => ['1E3', '1E3'],
+        'a decimal comma' => ['0,5', '0,5'],
+        'an explicit plus' => ['+1', '+1'],
+        'no leading digit' => ['.5', '.5'],
+        'no trailing digit' => ['5.', '5.'],
+        'two points' => ['1.2.3', '1.2.3'],
+        'hex' => ['0x1A', '0x1A'],
+        'an inner space' => ['1 000', '1 000'],
+        'a spaced minus' => ['- 1', '- 1'],
+        'a double minus' => ['--1', '--1'],
+        'trailing junk' => ['0.5abc', '0.5abc'],
+        'a NAN string' => ['NAN', 'NAN'],
+        'an INF string' => ['INF', 'INF'],
+        'an overflow' => ['1'.str_repeat('0', 400), '1'.str_repeat('0', 400)],
+        'NAN' => [NAN, 'NAN'],
+        'INF' => [INF, 'INF'],
+        '-INF' => [-INF, '-INF'],
+        'true' => [true, 'true'],
+        'false' => [false, 'false'],
+        'an array' => [[0.5], 'array'],
+    ]);
+
+    it('range-checks the value, naming the bound and the value', function (mixed $value, ?float $min, ?float $max, string $message): void {
+        config()->set('toolbox.rate', $value);
+
+        expect(fn (): float => Config::float('toolbox.rate', 0.5, $min, $max))->toThrow(
+            InvalidConfigurationException::class,
+            "Configuration value [toolbox.rate] {$message}",
+        );
+    })->with([
+        'above a closed range' => ['1.5', 0.0, 1.0, 'must be between 0 and 1, [1.5] given.'],
+        'below a closed range' => [-0.1, 0.0, 1.0, 'must be between 0 and 1, [-0.1] given.'],
+        'below a fractional floor' => ['0.25', 0.5, null, 'must be at least 0.5, [0.25] given.'],
+        'above a fractional ceiling' => [3, null, 2.5, 'must be at most 2.5, [3] given.'],
+    ]);
+
+    it('accepts the bounds themselves, given as floats or ints', function (): void {
+        config()->set('toolbox.rate', '1');
+
+        expect(Config::float('toolbox.rate', 0.5, min: 0.0, max: 1.0))->toBe(1.0)
+            ->and(Config::float('toolbox.rate', 0.5, min: 1))->toBe(1.0)
+            ->and(Config::float('toolbox.rate', 0.5, max: 1))->toBe(1.0);
+
+        config()->set('toolbox.rate', '0.0');
+
+        expect(Config::float('toolbox.rate', 0.5, min: 0, max: 1))->toBe(0.0);
+    });
+
+    it('range-checks the default too', function (mixed $notSet): void {
+        config()->set('toolbox.rate', $notSet);
+
+        Config::float('toolbox.rate', 2.0, min: 0.0, max: 1.0);
+    })->with([
+        'absent' => [null],
+        'blank' => [''],
+    ])->throws(InvalidConfigurationException::class, 'Configuration value [toolbox.rate] must be between 0 and 1, [2.0] given.');
+
+    it('rejects a non-finite default', function (float $default, string $given): void {
+        expect(fn (): float => Config::float('toolbox.never_set', $default))->toThrow(
+            InvalidConfigurationException::class,
+            "Configuration value [toolbox.never_set] must be a decimal number, [{$given}] given.",
+        );
+    })->with([
+        'NAN' => [NAN, 'NAN'],
+        'INF' => [INF, 'INF'],
+        '-INF' => [-INF, '-INF'],
+    ]);
+
+    it('throws the nominated exception', function (): void {
+        config()->set('toolbox.rate', 'abc');
+
+        expect(fn (): float => Config::using(CustomConfigException::class)->float('toolbox.rate', 0.5))
+            ->toThrow(CustomConfigException::class, '[toolbox.rate] must be a decimal number, [abc] given.')
+            ->and(fn (): float => Config::for(['rate' => '1.5'], CustomConfigException::class)->float('rate', 0.5, max: 1.0))
+            ->toThrow(CustomConfigException::class, '[rate] must be at most 1, [1.5] given.');
+    });
+});
+
 describe('requireString', function (): void {
     it('returns a present string', function (): void {
         config()->set('toolbox.s', 'value');

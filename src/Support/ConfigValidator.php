@@ -79,6 +79,34 @@ final class ConfigValidator
     }
 
     /**
+     * A decimal number. Falls back to `$default` only when not set (absent, null
+     * or blank — `''` or whitespace); anything else must be an `int`, a finite
+     * `float`, or a canonical decimal string (an optional `-`, digits, an
+     * optional `.` followed by digits, surrounding whitespace ignored), and
+     * THROWS otherwise: `'abc'`, `'1e3'`, `'0,5'`, `'+1'`, `'.5'`, `'5.'`,
+     * `'NAN'`, an overflowing number, `NAN`/`INF`, a bool or an array never
+     * become a number. Canonical only, like {@see self::integer()}: `'.5'` and
+     * `'5.'` are rejected rather than guessed at. `$min` / `$max`, when given,
+     * bound the result inclusively — the default included, and a non-finite
+     * default throws too.
+     */
+    public function float(string $key, float $default, ?float $min = null, ?float $max = null): float
+    {
+        $raw = $this->read($key);
+        $value = $raw === null ? $default : self::toFloat($raw);
+
+        if ($value === null || ! is_finite($value)) {
+            throw $this->fail(InvalidConfigurationException::notAFloat($key, $raw ?? $default));
+        }
+
+        if (($min !== null && $value < $min) || ($max !== null && $value > $max)) {
+            throw $this->fail(InvalidConfigurationException::outOfRange($key, $min, $max, $raw ?? $default));
+        }
+
+        return $value;
+    }
+
+    /**
      * A required string value; throws `missing` when not set (absent, null or
      * blank) and `notAString` for any other non-string.
      */
@@ -215,6 +243,25 @@ final class ConfigValidator
         $integer = $value + 0;
 
         return is_int($integer) ? $integer : null;
+    }
+
+    /**
+     * An int or a float as a float, or a canonical decimal string (optional `-`,
+     * digits, optionally `.` and more digits, optionally whitespace-padded) as
+     * the float it spells; null for anything else. A non-finite result — `NAN`,
+     * `INF`, or a string too long for a float — is the caller's to reject.
+     */
+    private static function toFloat(mixed $value): ?float
+    {
+        if (is_int($value) || is_float($value)) {
+            return (float) $value;
+        }
+
+        if (! is_string($value) || preg_match('/^\s*-?\d+(?:\.\d+)?\s*$/', $value) !== 1) {
+            return null;
+        }
+
+        return (float) $value;
     }
 
     /**

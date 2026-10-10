@@ -34,6 +34,19 @@ final class Config
     }
 
     /**
+     * A decimal config value: `$default` only when the key is not set (absent,
+     * null or blank); otherwise an `int`, a finite `float` or a canonical decimal
+     * string (`'0.25'`, `'-0.5'`, `' 1 '`, `'3'`), bounded inclusively by `$min` /
+     * `$max` when given. Anything else — `'abc'`, `'1e3'`, `'0,5'`, `'+1'`,
+     * `'.5'`, `'5.'`, `NAN`/`INF`, a bool — throws, and so does a value (or
+     * default) out of range or a non-finite default.
+     */
+    public static function float(string $key, float $default, ?float $min = null, ?float $max = null): float
+    {
+        return ConfigValidator::forRepository()->float($key, $default, $min, $max);
+    }
+
+    /**
      * A required string config value; throws `missing` when not set (absent,
      * null or blank) and when present but not a string.
      */

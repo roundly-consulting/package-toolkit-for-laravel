@@ -6,6 +6,13 @@ All notable changes to `package-toolkit-for-laravel` are documented in this file
 
 ## Unreleased
 
+### Added
+
+- `Config::float()` (and `ConfigValidator::float()`) reads a decimal setting such as a sample
+  rate: an int, a float or a canonical decimal string (`'0.25'`, `'-0.5'`), bounded inclusively
+  by optional `$min` / `$max`. A blank value reads as the default; `'abc'`, `'1e3'`, `'0,5'`,
+  `'.5'`, `NAN`/`INF` and out-of-range values or defaults throw.
+
 ## 1.1.0 - 2026-10-05
 
 ### Added

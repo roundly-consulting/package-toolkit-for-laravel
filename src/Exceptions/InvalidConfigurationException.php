@@ -53,7 +53,12 @@ final class InvalidConfigurationException extends PackageToolkitException
         return self::mustBe($key, 'an integer', $value);
     }
 
-    public static function outOfRange(string $key, ?int $min, ?int $max, mixed $value): self
+    public static function notAFloat(string $key, mixed $value): self
+    {
+        return self::mustBe($key, 'a decimal number', $value);
+    }
+
+    public static function outOfRange(string $key, int|float|null $min, int|float|null $max, mixed $value): self
     {
         $bound = match (true) {
             $min !== null && $max !== null => "between {$min} and {$max}",
