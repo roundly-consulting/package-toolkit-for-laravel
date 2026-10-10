@@ -9,6 +9,7 @@ use Closure;
 use Illuminate\Support\Arr;
 use ReflectionEnum;
 use RoundlyConsulting\PackageToolkit\Exceptions\InvalidConfigurationException;
+use SensitiveParameter;
 use Throwable;
 
 /**
@@ -28,7 +29,7 @@ final class ConfigValidator
      * @param  class-string<Throwable>  $exception  thrown on any failure; must accept a string message
      */
     private function __construct(
-        private readonly ?array $config,
+        #[SensitiveParameter] private readonly ?array $config,
         private readonly string $exception,
     ) {}
 
@@ -39,7 +40,7 @@ final class ConfigValidator
      * @param  array<string, mixed>  $config
      * @param  class-string<Throwable>  $exception
      */
-    public static function forArray(array $config, string $exception = InvalidConfigurationException::class): self
+    public static function forArray(#[SensitiveParameter] array $config, string $exception = InvalidConfigurationException::class): self
     {
         return new self($config, $exception);
     }
@@ -63,7 +64,7 @@ final class ConfigValidator
      * an overflowing number, a float, a bool or an array never become a number.
      * `$min` / `$max`, when given, bound the result — the default included.
      */
-    public function integer(string $key, int $default, ?int $min = null, ?int $max = null): int
+    public function integer(string $key, #[SensitiveParameter] int $default, ?int $min = null, ?int $max = null): int
     {
         $raw = $this->read($key);
         $value = $raw === null ? $default : self::toInteger($raw);
@@ -91,7 +92,7 @@ final class ConfigValidator
      * bound the result inclusively — the default included, and a non-finite
      * default throws too.
      */
-    public function float(string $key, float $default, ?float $min = null, ?float $max = null): float
+    public function float(string $key, #[SensitiveParameter] float $default, ?float $min = null, ?float $max = null): float
     {
         $raw = $this->read($key);
         $value = $raw === null ? $default : self::toFloat($raw);
@@ -134,7 +135,7 @@ final class ConfigValidator
      * `notAString`. There is deliberately no switch that lets a blank value
      * through: blank means "use the default", as for every other reader.
      */
-    public function string(string $key, string $default): string
+    public function string(string $key, #[SensitiveParameter] string $default): string
     {
         $value = $this->read($key);
 
@@ -165,7 +166,7 @@ final class ConfigValidator
      * @param  (Closure(string): bool)|null  $each
      * @return list<string>
      */
-    public function list(string $key, array $default, ?Closure $each = null): array
+    public function list(string $key, #[SensitiveParameter] array $default, ?Closure $each = null): array
     {
         $raw = $this->read($key);
 
@@ -202,7 +203,7 @@ final class ConfigValidator
      * @param  TEnum|null  $default
      * @return TEnum
      */
-    public function enum(string $key, string $enum, ?BackedEnum $default = null): BackedEnum
+    public function enum(string $key, string $enum, #[SensitiveParameter] ?BackedEnum $default = null): BackedEnum
     {
         $value = $this->read($key);
 
@@ -222,7 +223,7 @@ final class ConfigValidator
      *
      * @param  non-empty-list<string>  $allowed
      */
-    public function oneOf(string $key, array $allowed, string $default): string
+    public function oneOf(string $key, array $allowed, #[SensitiveParameter] string $default): string
     {
         $value = $this->read($key) ?? $default;
 
@@ -240,7 +241,7 @@ final class ConfigValidator
      * typo such as `ALLOW_X=disabled` fails loudly instead of silently reading as
      * the default. The message names the key, the value and the accepted spellings.
      */
-    public function boolean(string $key, bool $default = false): bool
+    public function boolean(string $key, #[SensitiveParameter] bool $default = false): bool
     {
         $value = $this->read($key);
 
@@ -268,7 +269,7 @@ final class ConfigValidator
      * @param  class-string<TEnum>  $enum
      * @return TEnum|null
      */
-    private static function toCase(string $enum, mixed $value): ?BackedEnum
+    private static function toCase(string $enum, #[SensitiveParameter] mixed $value): ?BackedEnum
     {
         if ($value instanceof $enum) {
             return $value;
@@ -293,7 +294,7 @@ final class ConfigValidator
      * number — `'--5'` (0), `'1.5'` (1), `'5abc'` (5), `'1e3'` (1000), or an
      * overflowing `'99999999999999999999'` (PHP_INT_MAX) — and an explicit `+`.
      */
-    private static function toInteger(mixed $value): ?int
+    private static function toInteger(#[SensitiveParameter] mixed $value): ?int
     {
         if (is_int($value)) {
             return $value;
@@ -315,7 +316,7 @@ final class ConfigValidator
      * the float it spells; null for anything else. A non-finite result — `NAN`,
      * `INF`, or a string too long for a float — is the caller's to reject.
      */
-    private static function toFloat(mixed $value): ?float
+    private static function toFloat(#[SensitiveParameter] mixed $value): ?float
     {
         if (is_int($value) || is_float($value)) {
             return (float) $value;
@@ -335,7 +336,7 @@ final class ConfigValidator
      * @param  array<mixed>  $items
      * @return list<string>
      */
-    private function toList(string $key, array $items): array
+    private function toList(string $key, #[SensitiveParameter] array $items): array
     {
         $list = [];
 
@@ -368,7 +369,7 @@ final class ConfigValidator
      * preserving the message so the package's own hierarchy is what a host
      * catches.
      */
-    private function fail(InvalidConfigurationException $canonical): Throwable
+    private function fail(#[SensitiveParameter] InvalidConfigurationException $canonical): Throwable
     {
         if ($this->exception === InvalidConfigurationException::class) {
             return $canonical;

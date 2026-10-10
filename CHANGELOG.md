@@ -6,6 +6,15 @@ All notable changes to `package-toolkit-for-laravel` are documented in this file
 
 ## Unreleased
 
+### Security
+
+- A configuration value no longer shows in the arguments of an exception's stack frames
+  (`getTrace()`, `getTraceAsString()`) when `zend.exception_ignore_args` is off. Every
+  `InvalidConfigurationException` factory's value parameter, the readers' `$default`s and the
+  array handed to `Config::for()` / `ConfigValidator::forArray()` are `#[SensitiveParameter]`.
+  Error trackers that collect frame arguments, `print_r($e)` and trace loggers used to get the
+  value. The messages are unchanged.
+
 ## 1.2.0 - 2026-10-10
 
 ### Added

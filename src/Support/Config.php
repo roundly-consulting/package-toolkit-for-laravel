@@ -7,6 +7,7 @@ namespace RoundlyConsulting\PackageToolkit\Support;
 use BackedEnum;
 use Closure;
 use RoundlyConsulting\PackageToolkit\Exceptions\InvalidConfigurationException;
+use SensitiveParameter;
 use Throwable;
 
 /**
@@ -29,7 +30,7 @@ final class Config
      * bounded by `$min` / `$max` when given. Anything else — `'five'`, `'5.5'`,
      * `'1e3'`, a bool — throws, and so does a value (or default) out of range.
      */
-    public static function integer(string $key, int $default, ?int $min = null, ?int $max = null): int
+    public static function integer(string $key, #[SensitiveParameter] int $default, ?int $min = null, ?int $max = null): int
     {
         return ConfigValidator::forRepository()->integer($key, $default, $min, $max);
     }
@@ -42,7 +43,7 @@ final class Config
      * `'.5'`, `'5.'`, `NAN`/`INF`, a bool — throws, and so does a value (or
      * default) out of range or a non-finite default.
      */
-    public static function float(string $key, float $default, ?float $min = null, ?float $max = null): float
+    public static function float(string $key, #[SensitiveParameter] float $default, ?float $min = null, ?float $max = null): float
     {
         return ConfigValidator::forRepository()->float($key, $default, $min, $max);
     }
@@ -61,7 +62,7 @@ final class Config
      * key is not set (absent, null or blank); a present string is returned as
      * given, never trimmed; a non-string (int, float, bool, array) throws.
      */
-    public static function string(string $key, string $default): string
+    public static function string(string $key, #[SensitiveParameter] string $default): string
     {
         return ConfigValidator::forRepository()->string($key, $default);
     }
@@ -78,7 +79,7 @@ final class Config
      * @param  (Closure(string): bool)|null  $each
      * @return list<string>
      */
-    public static function list(string $key, array $default, ?Closure $each = null): array
+    public static function list(string $key, #[SensitiveParameter] array $default, ?Closure $each = null): array
     {
         return ConfigValidator::forRepository()->list($key, $default, $each);
     }
@@ -96,7 +97,7 @@ final class Config
      * @param  TEnum|null  $default
      * @return TEnum
      */
-    public static function enum(string $key, string $enum, ?BackedEnum $default = null): BackedEnum
+    public static function enum(string $key, string $enum, #[SensitiveParameter] ?BackedEnum $default = null): BackedEnum
     {
         return ConfigValidator::forRepository()->enum($key, $enum, $default);
     }
@@ -108,7 +109,7 @@ final class Config
      *
      * @param  non-empty-list<string>  $allowed
      */
-    public static function oneOf(string $key, array $allowed, string $default): string
+    public static function oneOf(string $key, array $allowed, #[SensitiveParameter] string $default): string
     {
         return ConfigValidator::forRepository()->oneOf($key, $allowed, $default);
     }
@@ -119,7 +120,7 @@ final class Config
      * — returns `$default`; anything else throws, so an env typo such as
      * `disabled` fails loudly instead of silently reading as the default.
      */
-    public static function boolean(string $key, bool $default = false): bool
+    public static function boolean(string $key, #[SensitiveParameter] bool $default = false): bool
     {
         return ConfigValidator::forRepository()->boolean($key, $default);
     }
@@ -133,7 +134,7 @@ final class Config
      * @param  array<string, mixed>  $config
      * @param  class-string<Throwable>  $exception
      */
-    public static function for(array $config, string $exception = InvalidConfigurationException::class): ConfigValidator
+    public static function for(#[SensitiveParameter] array $config, string $exception = InvalidConfigurationException::class): ConfigValidator
     {
         return ConfigValidator::forArray($config, $exception);
     }
