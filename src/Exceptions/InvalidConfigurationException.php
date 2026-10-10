@@ -13,8 +13,9 @@ use RoundlyConsulting\PackageToolkit\Enums\KeyType;
  * wrong type, out of range, or otherwise unusable.
  *
  * Every "wrong value" message has one shape — `Configuration value [key] must
- * be …, [given] given.` — where `given` is the offending value as written (`''`
- * when empty), a scalar as its PHP literal, or anything else by its type.
+ * be …, [given] given.` (`must contain …` for a list item) — where `given` is the
+ * offending value (or list item) as written (`''` when empty), a scalar as its
+ * PHP literal, or anything else by its type.
  */
 final class InvalidConfigurationException extends PackageToolkitException
 {
@@ -69,6 +70,21 @@ final class InvalidConfigurationException extends PackageToolkitException
         return self::mustBe($key, $bound, $value);
     }
 
+    public static function notAList(string $key, mixed $value): self
+    {
+        return self::mustBe($key, 'a list of strings (an array or a comma-separated string)', $value);
+    }
+
+    public static function notAStringItem(string $key, mixed $item): self
+    {
+        return self::must($key, 'contain only string items', $item);
+    }
+
+    public static function notAValidListItem(string $key, string $item): self
+    {
+        return self::must($key, 'contain only valid items', $item);
+    }
+
     /**
      * @param  class-string<BackedEnum>  $enum
      */
@@ -102,7 +118,12 @@ final class InvalidConfigurationException extends PackageToolkitException
 
     private static function mustBe(string $key, string $expectation, mixed $value): self
     {
-        return new self("Configuration value [{$key}] must be {$expectation}, [".self::describe($value).'] given.');
+        return self::must($key, "be {$expectation}", $value);
+    }
+
+    private static function must(string $key, string $requirement, mixed $value): self
+    {
+        return new self("Configuration value [{$key}] must {$requirement}, [".self::describe($value).'] given.');
     }
 
     /**

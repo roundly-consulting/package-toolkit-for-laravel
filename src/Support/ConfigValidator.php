@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace RoundlyConsulting\PackageToolkit\Support;
 
 use BackedEnum;
+use Closure;
 use Illuminate\Support\Arr;
 use ReflectionEnum;
 use RoundlyConsulting\PackageToolkit\Exceptions\InvalidConfigurationException;
@@ -147,6 +148,48 @@ final class ConfigValidator
     }
 
     /**
+     * A list of strings, from a published config array (`['en', 'sk']`) or an env
+     * comma list (`'en, sk'`). Items are trimmed, empty items are dropped and the
+     * result is re-indexed; duplicates and inner spaces are kept. Not set (absent,
+     * null or blank) — and a value that yields no items (`','`, `[]`, `[' ', '']`)
+     * — returns `$default`, normalised the same way: blank means "use the
+     * default", so a host cannot configure an empty list over a non-empty one.
+     *
+     * A value that is neither an array nor a string THROWS `notAList`; an array
+     * item that is not a string THROWS `notAStringItem`. `$each`, when given,
+     * sees every resulting item — the default's included, as {@see self::integer()}
+     * bounds its default — and anything but a `true` return THROWS
+     * `notAValidListItem`, naming the item.
+     *
+     * @param  array<string>  $default
+     * @param  (Closure(string): bool)|null  $each
+     * @return list<string>
+     */
+    public function list(string $key, array $default, ?Closure $each = null): array
+    {
+        $raw = $this->read($key);
+
+        $items = match (true) {
+            $raw === null => [],
+            is_string($raw) => $this->toList($key, explode(',', $raw)),
+            is_array($raw) => $this->toList($key, $raw),
+            default => throw $this->fail(InvalidConfigurationException::notAList($key, $raw)),
+        };
+
+        if ($items === []) {
+            $items = $this->toList($key, $default);
+        }
+
+        foreach ($items as $item) {
+            if ($each !== null && $each($item) !== true) {
+                throw $this->fail(InvalidConfigurationException::notAValidListItem($key, $item));
+            }
+        }
+
+        return $items;
+    }
+
+    /**
      * A backed-enum value. Not set (absent, null or blank) returns `$default`, or
      * throws `missing` when no default is given. A case of the enum is returned as-is; any other value must
      * be one of the backing values — matched exactly and case-sensitively, after
@@ -283,6 +326,30 @@ final class ConfigValidator
         }
 
         return (float) $value;
+    }
+
+    /**
+     * The items of a config list, trimmed, with empty ones dropped and the keys
+     * discarded; throws `notAStringItem` for the first item that is not a string.
+     *
+     * @param  array<mixed>  $items
+     * @return list<string>
+     */
+    private function toList(string $key, array $items): array
+    {
+        $list = [];
+
+        foreach ($items as $item) {
+            if (! is_string($item)) {
+                throw $this->fail(InvalidConfigurationException::notAStringItem($key, $item));
+            }
+
+            if (($item = trim($item)) !== '') {
+                $list[] = $item;
+            }
+        }
+
+        return $list;
     }
 
     /**

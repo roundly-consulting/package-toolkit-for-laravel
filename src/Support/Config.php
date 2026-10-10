@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace RoundlyConsulting\PackageToolkit\Support;
 
 use BackedEnum;
+use Closure;
 use RoundlyConsulting\PackageToolkit\Exceptions\InvalidConfigurationException;
 use Throwable;
 
@@ -63,6 +64,23 @@ final class Config
     public static function string(string $key, string $default): string
     {
         return ConfigValidator::forRepository()->string($key, $default);
+    }
+
+    /**
+     * A list-of-strings config value, from a published array (`['en', 'sk']`) or
+     * an env comma list (`'en, sk'`): items trimmed, empty ones dropped, result
+     * re-indexed. `$default` (normalised the same way) when the key is not set
+     * (absent, null or blank) or yields no items (`','`, `[]`). A non-array,
+     * non-string value or a non-string item throws, and so does any item —
+     * the default's included — that `$each` does not return `true` for.
+     *
+     * @param  array<string>  $default
+     * @param  (Closure(string): bool)|null  $each
+     * @return list<string>
+     */
+    public static function list(string $key, array $default, ?Closure $each = null): array
+    {
+        return ConfigValidator::forRepository()->list($key, $default, $each);
     }
 
     /**

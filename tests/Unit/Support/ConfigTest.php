@@ -335,6 +335,159 @@ describe('string', function (): void {
     });
 });
 
+describe('list', function (): void {
+    it('splits a comma-separated string, trimming items and dropping empty ones', function (string $value, array $expected): void {
+        config()->set('toolbox.hosts', $value);
+
+        expect(Config::list('toolbox.hosts', ['default']))->toBe($expected)
+            ->and(Config::for(['hosts' => $value])->list('hosts', ['default']))->toBe($expected);
+    })->with([
+        'one item' => ['api', ['api']],
+        'several' => ['a,b,c', ['a', 'b', 'c']],
+        'padded' => [' a , b ,c ', ['a', 'b', 'c']],
+        'an empty item' => ['a,,b', ['a', 'b']],
+        'a blank item' => ["a, \t,b", ['a', 'b']],
+        'edge commas' => [',a,', ['a']],
+        'newlines' => ["a\n,b\n", ['a', 'b']],
+        'inner spaces kept' => ['en GB, sk', ['en GB', 'sk']],
+        'duplicates kept' => ['a,a', ['a', 'a']],
+    ]);
+
+    it('reads an array of strings, trimming items, dropping empty ones and re-indexing', function (array $value, array $expected): void {
+        config()->set('toolbox.hosts', $value);
+
+        expect(Config::list('toolbox.hosts', ['default']))->toBe($expected)
+            ->and(Config::for(['hosts' => $value])->list('hosts', ['default']))->toBe($expected);
+    })->with([
+        'a list' => [['a', 'b'], ['a', 'b']],
+        'padded and empty items' => [[' a ', '', '  ', 'b '], ['a', 'b']],
+        'string keys' => [['x' => 'a', 'y' => 'b'], ['a', 'b']],
+        'sparse keys' => [[2 => 'a', 5 => 'b'], ['a', 'b']],
+        'an item with a comma' => [['a,b'], ['a,b']],
+    ]);
+
+    it('reads a value that is not set, or yields no items, as the default', function (mixed $notSet): void {
+        config()->set('toolbox.hosts', $notSet);
+
+        expect(Config::list('toolbox.hosts', ['localhost']))->toBe(['localhost'])
+            ->and(Config::list('toolbox.never_set', ['a', 'b']))->toBe(['a', 'b'])
+            ->and(Config::list('toolbox.hosts', []))->toBe([])
+            ->and(Config::for(['hosts' => $notSet])->list('hosts', ['x']))->toBe(['x'])
+            ->and(Config::for([])->list('hosts', ['y']))->toBe(['y']);
+    })->with([
+        'null' => [null],
+        'empty' => [''],
+        'spaces' => ['   '],
+        'mixed whitespace' => [" \t\r\n "],
+        'a lone comma' => [','],
+        'blank items' => [' , , '],
+        'an empty array' => [[]],
+        'an array of blanks' => [[' ', '']],
+    ]);
+
+    it('normalises the default it falls back to', function (): void {
+        expect(Config::list('toolbox.never_set', [' a ', '', 'b']))->toBe(['a', 'b'])
+            ->and(Config::list('toolbox.never_set', [3 => 'a']))->toBe(['a']);
+    });
+
+    it('THROWS on a value that is neither an array nor a string', function (mixed $value, string $given): void {
+        config()->set('toolbox.hosts', $value);
+
+        expect(fn (): array => Config::list('toolbox.hosts', ['default']))->toThrow(
+            InvalidConfigurationException::class,
+            "Configuration value [toolbox.hosts] must be a list of strings (an array or a comma-separated string), [{$given}] given.",
+        );
+    })->with([
+        'an int' => [5, '5'],
+        'a float' => [1.5, '1.5'],
+        'true' => [true, 'true'],
+        'false' => [false, 'false'],
+        'an object' => [new stdClass, 'stdClass'],
+    ]);
+
+    it('THROWS on an array item that is not a string, naming it', function (array $value, string $given): void {
+        config()->set('toolbox.hosts', $value);
+
+        expect(fn (): array => Config::list('toolbox.hosts', ['default']))->toThrow(
+            InvalidConfigurationException::class,
+            "Configuration value [toolbox.hosts] must contain only string items, [{$given}] given.",
+        );
+    })->with([
+        'an int' => [['a', 5], '5'],
+        'null' => [['a', null], 'null'],
+        'true' => [['a', true], 'true'],
+        'a nested array' => [['a', ['b']], 'array'],
+        'the only item' => [[null], 'null'],
+    ]);
+
+    it('hands each trimmed item to the validator', function (): void {
+        config()->set('toolbox.hosts', ' a.test , b.test ');
+        $seen = [];
+
+        $hosts = Config::list('toolbox.hosts', [], function (string $item) use (&$seen): bool {
+            $seen[] = $item;
+
+            return true;
+        });
+
+        expect($hosts)->toBe(['a.test', 'b.test'])
+            ->and($seen)->toBe(['a.test', 'b.test']);
+    });
+
+    it('THROWS when the validator rejects an item, naming the key and the item', function (mixed $value): void {
+        config()->set('toolbox.locales', $value);
+
+        expect(fn (): array => Config::list('toolbox.locales', ['en'], fn (string $locale): bool => in_array($locale, ['en', 'sk'], true)))
+            ->toThrow(
+                InvalidConfigurationException::class,
+                'Configuration value [toolbox.locales] must contain only valid items, [de] given.',
+            );
+    })->with([
+        'from a string' => ['en, de ,sk'],
+        'from an array' => [['en', ' de', 'sk']],
+    ]);
+
+    it('accepts an item only on a true return', function (): void {
+        config()->set('toolbox.locales', 'en');
+
+        Config::list('toolbox.locales', [], fn (string $locale) => preg_match('/^[a-z]{2}$/', $locale));
+    })->throws(InvalidConfigurationException::class, 'must contain only valid items, [en] given.');
+
+    it('runs the validator over the default it falls back to', function (mixed $notSet): void {
+        config()->set('toolbox.locales', $notSet);
+
+        Config::list('toolbox.locales', ['en', 'xx'], fn (string $locale): bool => $locale === 'en');
+    })->with([
+        'absent' => [null],
+        'blank' => [''],
+        'no items' => [','],
+    ])->throws(InvalidConfigurationException::class, 'Configuration value [toolbox.locales] must contain only valid items, [xx] given.');
+
+    it('leaves the default alone when the value is set', function (): void {
+        config()->set('toolbox.locales', 'en');
+
+        expect(Config::list('toolbox.locales', ['xx'], fn (string $locale): bool => $locale === 'en'))->toBe(['en']);
+    });
+
+    it('reaches into a handed array with dot notation', function (): void {
+        $validator = Config::for(['redaction' => ['extra_keys' => 'token, secret']]);
+
+        expect($validator->list('redaction.extra_keys', []))->toBe(['token', 'secret'])
+            ->and($validator->list('redaction.extra_headers', ['x-api-key']))->toBe(['x-api-key']);
+    });
+
+    it('throws the nominated exception', function (): void {
+        config()->set('toolbox.hosts', 5);
+
+        expect(fn (): array => Config::using(CustomConfigException::class)->list('toolbox.hosts', []))
+            ->toThrow(CustomConfigException::class, '[toolbox.hosts] must be a list of strings (an array or a comma-separated string), [5] given.')
+            ->and(fn (): array => Config::for(['hosts' => ['a', 1]], CustomConfigException::class)->list('hosts', []))
+            ->toThrow(CustomConfigException::class, '[hosts] must contain only string items, [1] given.')
+            ->and(fn (): array => Config::for(['hosts' => 'a,b'], CustomConfigException::class)->list('hosts', [], fn (string $host): bool => $host === 'a'))
+            ->toThrow(CustomConfigException::class, '[hosts] must contain only valid items, [b] given.');
+    });
+});
+
 describe('enum', function (): void {
     it('maps a backing value or passes an instance through', function (): void {
         config()->set('toolbox.kt', 'uuid');

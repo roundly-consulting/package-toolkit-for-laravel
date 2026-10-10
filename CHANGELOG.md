@@ -15,6 +15,10 @@ All notable changes to `package-toolkit-for-laravel` are documented in this file
 - `Config::string()` (and `ConfigValidator::string()`) reads an optional string with a shipped
   default. A blank `KEY=` now means the default instead of `''`; a present string comes back
   untrimmed, and a non-string (int, bool, array) throws.
+- `Config::list()` (and `ConfigValidator::list()`) reads a list of strings from a published
+  config array or an env comma list (`'en, sk'`): items trimmed, empty ones dropped. A blank
+  value or one with no items reads as the default. An optional `$each` closure validates every
+  item, the default's included, and a rejected item throws with the item named.
 
 ## 1.1.0 - 2026-10-05
 
