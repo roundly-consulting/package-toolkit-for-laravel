@@ -6,6 +6,8 @@ All notable changes to `package-toolkit-for-laravel` are documented in this file
 
 ## Unreleased
 
+## 1.2.0 - 2026-10-10
+
 ### Added
 
 - `Config::float()` (and `ConfigValidator::float()`) reads a decimal setting such as a sample
