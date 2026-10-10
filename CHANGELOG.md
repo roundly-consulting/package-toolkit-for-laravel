@@ -6,6 +6,8 @@ All notable changes to `package-toolkit-for-laravel` are documented in this file
 
 ## Unreleased
 
+## 1.3.0 - 2026-10-10
+
 ### Added
 
 - `Config::secret()`, `Config::requireSecret()` and `Config::secretList()` (and the same three
