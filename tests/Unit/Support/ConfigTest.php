@@ -271,6 +271,70 @@ describe('requireString', function (): void {
     ]);
 });
 
+describe('string', function (): void {
+    it('returns a present string exactly as given, never trimmed', function (string $value): void {
+        config()->set('toolbox.queue', $value);
+
+        expect(Config::string('toolbox.queue', 'default'))->toBe($value)
+            ->and(Config::for(['queue' => $value])->string('queue', 'default'))->toBe($value);
+    })->with([
+        'a word' => ['logs'],
+        'padded' => ['  x  '],
+        'a trailing newline' => ["secret\n"],
+        'a pattern' => ['^[a-z]+\.(read|write)$'],
+        'zero' => ['0'],
+    ]);
+
+    it('reads a value that is not set as the default', function (mixed $notSet): void {
+        config()->set('toolbox.queue', $notSet);
+
+        expect(Config::string('toolbox.queue', 'default'))->toBe('default')
+            ->and(Config::string('toolbox.never_set', 'other'))->toBe('other')
+            ->and(Config::for(['queue' => $notSet])->string('queue', 'logs'))->toBe('logs')
+            ->and(Config::for([])->string('queue', 'logs'))->toBe('logs');
+    })->with([
+        'null' => [null],
+        'empty' => [''],
+        'spaces' => ['   '],
+        'a tab' => ["\t"],
+        'mixed whitespace' => [" \t\r\n "],
+    ]);
+
+    it('returns the default exactly as given', function (): void {
+        expect(Config::string('toolbox.never_set', ' api '))->toBe(' api ');
+    });
+
+    it('THROWS on a non-string instead of reading the default', function (mixed $value, string $given): void {
+        config()->set('toolbox.queue', $value);
+
+        expect(fn (): string => Config::string('toolbox.queue', 'default'))->toThrow(
+            InvalidConfigurationException::class,
+            "Configuration value [toolbox.queue] must be a non-empty string, [{$given}] given.",
+        );
+    })->with([
+        'an int' => [5, '5'],
+        'a float' => [1.5, '1.5'],
+        'true' => [true, 'true'],
+        'false' => [false, 'false'],
+        'an array' => [['logs'], 'array'],
+        'an object' => [new stdClass, 'stdClass'],
+    ]);
+
+    it('throws the nominated exception', function (): void {
+        config()->set('toolbox.queue', ['logs']);
+
+        expect(fn (): string => Config::using(CustomConfigException::class)->string('toolbox.queue', 'default'))
+            ->toThrow(CustomConfigException::class, '[toolbox.queue] must be a non-empty string, [array] given.')
+            ->and(fn (): string => Config::for(['queue' => false], CustomConfigException::class)->string('queue', 'default'))
+            ->toThrow(CustomConfigException::class, '[queue] must be a non-empty string, [false] given.');
+    });
+
+    it('offers no switch that lets a blank value through', function (): void {
+        expect((new ReflectionMethod(Config::class, 'string'))->getNumberOfParameters())->toBe(2)
+            ->and((new ReflectionMethod(ConfigValidator::class, 'string'))->getNumberOfParameters())->toBe(2);
+    });
+});
+
 describe('enum', function (): void {
     it('maps a backing value or passes an instance through', function (): void {
         config()->set('toolbox.kt', 'uuid');

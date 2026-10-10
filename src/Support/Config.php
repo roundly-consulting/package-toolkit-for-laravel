@@ -56,6 +56,16 @@ final class Config
     }
 
     /**
+     * An optional string config value with a shipped default: `$default` when the
+     * key is not set (absent, null or blank); a present string is returned as
+     * given, never trimmed; a non-string (int, float, bool, array) throws.
+     */
+    public static function string(string $key, string $default): string
+    {
+        return ConfigValidator::forRepository()->string($key, $default);
+    }
+
+    /**
      * A backed-enum config value: `$default` only when the key is not set (absent,
      * null or blank)
      * — or a throw when no default is given. A case, or its exact

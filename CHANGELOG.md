@@ -12,6 +12,9 @@ All notable changes to `package-toolkit-for-laravel` are documented in this file
   rate: an int, a float or a canonical decimal string (`'0.25'`, `'-0.5'`), bounded inclusively
   by optional `$min` / `$max`. A blank value reads as the default; `'abc'`, `'1e3'`, `'0,5'`,
   `'.5'`, `NAN`/`INF` and out-of-range values or defaults throw.
+- `Config::string()` (and `ConfigValidator::string()`) reads an optional string with a shipped
+  default. A blank `KEY=` now means the default instead of `''`; a present string comes back
+  untrimmed, and a non-string (int, bool, array) throws.
 
 ## 1.1.0 - 2026-10-05
 

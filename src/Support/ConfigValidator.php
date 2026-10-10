@@ -126,6 +126,27 @@ final class ConfigValidator
     }
 
     /**
+     * An optional string with a shipped default. Not set (absent, null or blank —
+     * `''` or whitespace, a host's `KEY=`) returns `$default`; a present string
+     * is returned AS GIVEN, never trimmed, so a secret or a pattern keeps every
+     * character; any non-string (an int, a float, a bool, an array) THROWS
+     * `notAString`. There is deliberately no switch that lets a blank value
+     * through: blank means "use the default", as for every other reader.
+     */
+    public function string(string $key, string $default): string
+    {
+        $value = $this->read($key);
+
+        if ($value === null) {
+            return $default;
+        }
+
+        return is_string($value)
+            ? $value
+            : throw $this->fail(InvalidConfigurationException::notAString($key, $value));
+    }
+
+    /**
      * A backed-enum value. Not set (absent, null or blank) returns `$default`, or
      * throws `missing` when no default is given. A case of the enum is returned as-is; any other value must
      * be one of the backing values — matched exactly and case-sensitively, after
