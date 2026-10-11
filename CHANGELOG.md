@@ -6,6 +6,10 @@ All notable changes to `package-toolkit-for-laravel` are documented in this file
 
 ## Unreleased
 
+### Changed
+
+- Maintenance: requires the latest roundly packages — dev: testing `^1.2.1`.
+
 ## 1.3.0 - 2026-10-10
 
 ### Added
