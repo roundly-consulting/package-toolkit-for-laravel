@@ -147,19 +147,25 @@ final class Package
      * publish it under the `<name>-routes` tag. Once a host has published it,
      * the published `routes/<file>` loads instead of the package's file, so the
      * host's edits take effect (the switch gates either one). The switch is
-     * read strictly at boot, via {@see Config::boolean()} with a `true` default: `false`,
-     * `0`, `'0'`, `'false'`, `'off'` and `'no'` skip the file; `true`, `1`,
-     * `'1'`, `'true'`, `'on'`, `'yes'`, or a value that is not set (absent, `null`,
-     * blank `''` / whitespace) load it; anything
-     * else (`'disabled'`, `'ture'`, `2`) throws
-     * {@see InvalidConfigurationException} rather than loading the routes.
+     * read strictly at boot, via {@see Config::boolean()}: `false`, `0`, `'0'`,
+     * `'false'`, `'off'` and `'no'` skip the file; `true`, `1`, `'1'`, `'true'`,
+     * `'on'` and `'yes'` load it; a value that is not set (absent, `null`, blank
+     * `''` / whitespace) takes `$enabledByDefault`; anything else (`'disabled'`,
+     * `'ture'`, `2`) throws {@see InvalidConfigurationException} rather than
+     * loading the routes.
+     *
+     * Pass `enabledByDefault: false` for an opt-in API: a host config that lost
+     * the switch (a published file that overrides only part of the array — the
+     * merge is shallow — or a bare `env()` with the variable unset) keeps the
+     * routes off instead of failing open.
      */
-    public function hasRoutes(string $file, ?string $enabledVia = null): self
+    public function hasRoutes(string $file, ?string $enabledVia = null, bool $enabledByDefault = true): self
     {
         $this->routes[] = new RouteDeclaration(
             file: $file,
             tag: $this->name.'-routes',
             enabledVia: $enabledVia,
+            enabledByDefault: $enabledByDefault,
         );
 
         return $this;

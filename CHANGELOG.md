@@ -6,6 +6,14 @@ All notable changes to `package-toolkit-for-laravel` are documented in this file
 
 ## Unreleased
 
+### Added
+
+- `Package::hasRoutes()` takes `enabledByDefault` (default `true`, so nothing changes for
+  existing packages). Pass `false` for an opt-in API: a switch that is not set — the key missing
+  from a published config that overrides only part of its array (the merge is shallow), `null`,
+  or a bare `env()` with the variable unset — then keeps the routes off instead of loading them.
+  `RouteDeclaration` carries the flag.
+
 ### Changed
 
 - Maintenance: requires the latest roundly packages — dev: testing `^1.2.1`.

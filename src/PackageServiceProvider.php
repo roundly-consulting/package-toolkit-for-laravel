@@ -125,8 +125,9 @@ abstract class PackageServiceProvider extends ServiceProvider
 
         foreach ($this->package->routes as $route) {
             // Parsed strictly: `'off'` / `'0'` switch the route off, and a typo such as
-            // `'disabled'` throws rather than failing open by loading the routes.
-            if ($route->enabledVia !== null && ! Config::boolean($route->enabledVia, true)) {
+            // `'disabled'` throws rather than failing open by loading the routes. A switch
+            // that is not set takes the declaration's default (off for an opt-in API).
+            if ($route->enabledVia !== null && ! Config::boolean($route->enabledVia, $route->enabledByDefault)) {
                 continue;
             }
 
