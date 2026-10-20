@@ -6,6 +6,8 @@ All notable changes to `package-toolkit-for-laravel` are documented in this file
 
 ## Unreleased
 
+## 1.4.0 - 2026-10-20
+
 ### Added
 
 - `Package::hasRoutes()` takes `enabledByDefault` (default `true`, so nothing changes for
@@ -17,6 +19,8 @@ All notable changes to `package-toolkit-for-laravel` are documented in this file
 ### Changed
 
 - Maintenance: requires the latest roundly packages — dev: testing `^1.2.1`.
+- Maintenance: the real-engine CI leg starts Postgres on tmpfs with durability off, so it
+  boots while dependencies install and the leg runs faster.
 
 ## 1.3.0 - 2026-10-10
 
