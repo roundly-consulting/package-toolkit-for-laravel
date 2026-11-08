@@ -6,6 +6,15 @@ All notable changes to `package-toolkit-for-laravel` are documented in this file
 
 ## Unreleased
 
+### Added
+
+- `Exceptions\Concerns\DescribesConfigurationErrors`: the configuration-error factories
+  (`missing()`, `notAString()`, `outOfRange()`, `notAnImplementation()`, …) as a trait that
+  returns `static`. A package's own configuration exception can use it to throw the toolkit's
+  messages as its own type. `InvalidConfigurationException` uses it and stays `final`, and its
+  messages are unchanged. New factories for the new readers: `notAnIntegerList()`,
+  `notAnIntegerItem()`, `itemOutOfRange()`, `notAnIntegerOrOff()` and `notAStringMap()`.
+
 ## 2.0.0 - 2026-11-07
 
 ### Changed
