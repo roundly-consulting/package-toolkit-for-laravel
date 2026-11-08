@@ -8,6 +8,17 @@ All notable changes to `package-toolkit-for-laravel` are documented in this file
 
 ### Added
 
+- Five config readers on `Config` and `ConfigValidator`, with the same "not set means the
+  default, anything else is validated or throws" contract as the others:
+  - `optionalString($key)`: a string, or `null` when not set.
+  - `integerList($key, $default, $min, $max)`: a list of integers from an array or an env
+    comma list (`'1, 2, 3'`), with every item bounded, the default's included.
+  - `optionalInteger($key, $default, $min, $max, offWords: ['off'])`: an integer that a host
+    can switch off. An off word (case-insensitive) reads as `null`.
+  - `implementation($key, $contract, $default)`: the class-string of an instantiable
+    implementation of a contract. Anything else throws `notAnImplementation`.
+  - `stringMap($key)`: a map of names to non-empty strings. A bad value names its entry
+    (`[key.name]`).
 - `Exceptions\Concerns\DescribesConfigurationErrors`: the configuration-error factories
   (`missing()`, `notAString()`, `outOfRange()`, `notAnImplementation()`, …) as a trait that
   returns `static`. A package's own configuration exception can use it to throw the toolkit's

@@ -7,6 +7,7 @@ namespace RoundlyConsulting\PackageToolkit\Support;
 use BackedEnum;
 use Closure;
 use Illuminate\Support\Arr;
+use ReflectionClass;
 use ReflectionEnum;
 use RoundlyConsulting\PackageToolkit\Exceptions\InvalidConfigurationException;
 use SensitiveParameter;
@@ -282,6 +283,174 @@ final class ConfigValidator
     }
 
     /**
+     * An optional string with no default: not set (absent, null or blank — `''`
+     * or whitespace) returns null; a present string is returned AS GIVEN, never
+     * trimmed, as {@see self::string()} does; any non-string THROWS `notAString`,
+     * naming the value.
+     */
+    public function optionalString(string $key): ?string
+    {
+        $value = $this->read($key);
+
+        if ($value === null) {
+            return null;
+        }
+
+        return is_string($value)
+            ? $value
+            : throw $this->fail(InvalidConfigurationException::notAString($key, $value));
+    }
+
+    /**
+     * A list of integers, from a published array (`[1, 2, 3]`, `['1', '2']`) or
+     * an env comma list (`'1, 2, 3'`). Every item is an `int` or a canonical
+     * integer string, parsed as {@see self::integer()} parses one; blank string
+     * items are dropped and the result is re-indexed; duplicates are kept. Not
+     * set (absent, null or blank) — and a value that yields no items (`','`,
+     * `[]`) — returns `$default`.
+     *
+     * A value that is neither an array nor a string THROWS `notAnIntegerList`;
+     * an item that is not an integer THROWS `notAnIntegerItem`, naming it; an
+     * item outside `$min` / `$max` THROWS `itemOutOfRange` — the default's items
+     * included.
+     *
+     * @param  array<int>  $default
+     * @return list<int>
+     */
+    public function integerList(string $key, #[SensitiveParameter] array $default, ?int $min = null, ?int $max = null): array
+    {
+        $raw = $this->read($key);
+
+        $items = match (true) {
+            $raw === null => [],
+            is_string($raw) => $this->toIntegerList($key, explode(',', $raw)),
+            is_array($raw) => $this->toIntegerList($key, $raw),
+            default => throw $this->fail(InvalidConfigurationException::notAnIntegerList($key, $raw)),
+        };
+
+        if ($items === []) {
+            $items = $this->toIntegerList($key, $default);
+        }
+
+        foreach ($items as $item) {
+            if (($min !== null && $item < $min) || ($max !== null && $item > $max)) {
+                throw $this->fail(InvalidConfigurationException::itemOutOfRange($key, $min, $max, $item));
+            }
+        }
+
+        return $items;
+    }
+
+    /**
+     * An integer that can be switched off. Not set (absent, null or blank)
+     * returns `$default` — which may itself be null, "off unless configured". A
+     * string matching one of `$offWords` (case-insensitive, trimmed) returns
+     * null. Anything else is read as {@see self::integer()} reads it and bounded
+     * by `$min` / `$max` (the default included); a value that is neither an
+     * integer nor an off word THROWS `notAnIntegerOrOff`, listing the off words
+     * (`notAnInteger` when `$offWords` is empty).
+     *
+     * @param  list<string>  $offWords
+     */
+    public function optionalInteger(string $key, #[SensitiveParameter] ?int $default, ?int $min = null, ?int $max = null, array $offWords = ['off']): ?int
+    {
+        $raw = $this->read($key);
+
+        if (is_string($raw) && self::isOffWord($raw, $offWords)) {
+            return null;
+        }
+
+        $value = $raw === null ? $default : self::toInteger($raw);
+
+        if ($raw !== null && $value === null) {
+            throw $this->fail($offWords === []
+                ? InvalidConfigurationException::notAnInteger($key, $raw)
+                : InvalidConfigurationException::notAnIntegerOrOff($key, $offWords, $raw));
+        }
+
+        if ($value !== null && (($min !== null && $value < $min) || ($max !== null && $value > $max))) {
+            throw $this->fail(InvalidConfigurationException::outOfRange($key, $min, $max, $raw ?? $value));
+        }
+
+        return $value;
+    }
+
+    /**
+     * A class-string implementing (or extending) `$contract`, for a binding a
+     * host can swap. Not set (absent, null or blank) returns `$default` as given
+     * — the package's own choice, which may name a concrete contract itself, as
+     * {@see \RoundlyConsulting\PackageToolkit\PackageServiceProvider::bindFromConfig()}
+     * allows. Anything else must name an existing, instantiable class that is a
+     * `$contract` and not the contract itself, or it THROWS `notAnImplementation`
+     * — so `false`, a missing class, an abstract class, an interface or the bare
+     * contract never pass. The class is returned as declared (no leading
+     * backslash, its declared case).
+     *
+     * @template T of object
+     *
+     * @param  class-string<T>  $contract
+     * @param  class-string<T>|null  $default
+     * @return ($default is null ? class-string<T>|null : class-string<T>)
+     */
+    public function implementation(string $key, string $contract, ?string $default = null): ?string
+    {
+        $value = $this->read($key);
+
+        if ($value === null) {
+            return $default;
+        }
+
+        if (! is_string($value)
+            || ! class_exists($value)
+            || ! is_subclass_of($value, $contract)
+            || ! ($class = new ReflectionClass($value))->isInstantiable()) {
+            throw $this->fail(InvalidConfigurationException::notAnImplementation($key, $contract, $value));
+        }
+
+        return $class->getName();
+    }
+
+    /**
+     * A map of names to strings (`['view' => 'workflows.view']`), such as a
+     * table of abilities or of channel names. Not set (absent, null or blank)
+     * returns `[]`. A value that is not an array, or an entry whose name is not a
+     * non-empty string, THROWS `notAStringMap`; a value that is not a non-empty
+     * string THROWS `notAString` naming the entry (`[key.name]`). Values are
+     * returned as given, never trimmed. PHP stores an integer-like name (`'5'`)
+     * as an int, so such a name is refused too.
+     *
+     * @return array<string, string>
+     */
+    public function stringMap(string $key): array
+    {
+        $raw = $this->read($key);
+
+        if ($raw === null) {
+            return [];
+        }
+
+        if (! is_array($raw)) {
+            throw $this->fail(InvalidConfigurationException::notAStringMap($key, $raw));
+        }
+
+        $map = [];
+
+        foreach ($raw as $name => $value) {
+            if (! is_string($name) || trim($name) === '') {
+                throw $this->fail(InvalidConfigurationException::notAStringMap($key, $name));
+            }
+
+            if (! is_string($value) || trim($value) === '') {
+                throw $this->fail(InvalidConfigurationException::notAString("{$key}.{$name}", $value));
+            }
+
+            $map[$name] = $value;
+        }
+
+        return $map;
+    }
+
+    /**
      * The list at `$key` (see {@see self::list()}); a `$secret` list describes
      * whatever it rejects by type only.
      *
@@ -421,6 +590,47 @@ final class ConfigValidator
         }
 
         return $list;
+    }
+
+    /**
+     * The items of an integer list as ints, blank string items dropped and the
+     * keys discarded; throws `notAnIntegerItem` for the first item that is not an
+     * integer.
+     *
+     * @param  array<mixed>  $items
+     * @return list<int>
+     */
+    private function toIntegerList(string $key, #[SensitiveParameter] array $items): array
+    {
+        $list = [];
+
+        foreach ($items as $item) {
+            if (is_string($item) && trim($item) === '') {
+                continue;
+            }
+
+            $list[] = self::toInteger($item) ?? throw $this->fail(InvalidConfigurationException::notAnIntegerItem($key, $item));
+        }
+
+        return $list;
+    }
+
+    /**
+     * Whether `$value` spells one of `$offWords` (case-insensitive, trimmed).
+     *
+     * @param  list<string>  $offWords
+     */
+    private static function isOffWord(string $value, array $offWords): bool
+    {
+        $value = strtolower(trim($value));
+
+        foreach ($offWords as $word) {
+            if (strtolower(trim($word)) === $value) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

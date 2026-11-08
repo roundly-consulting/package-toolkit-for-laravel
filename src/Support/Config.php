@@ -160,6 +160,73 @@ final class Config
     }
 
     /**
+     * An optional string with no default: null when the key is not set (absent,
+     * null or blank); a present string is returned as given, never trimmed; a
+     * non-string throws, naming the value.
+     */
+    public static function optionalString(string $key): ?string
+    {
+        return ConfigValidator::forRepository()->optionalString($key);
+    }
+
+    /**
+     * A list-of-integers config value, from a published array (`[1, 2]`) or an
+     * env comma list (`'1, 2'`): every item an `int` or a canonical integer
+     * string, blank items dropped, result re-indexed. `$default` when the key is
+     * not set or yields no items. A non-list value, a non-integer item, or an
+     * item (the default's included) outside `$min` / `$max` throws.
+     *
+     * @param  array<int>  $default
+     * @return list<int>
+     */
+    public static function integerList(string $key, #[SensitiveParameter] array $default, ?int $min = null, ?int $max = null): array
+    {
+        return ConfigValidator::forRepository()->integerList($key, $default, $min, $max);
+    }
+
+    /**
+     * An integer config value that can be switched off: `$default` (possibly
+     * null) when the key is not set; null for one of `$offWords`
+     * (case-insensitive, trimmed); otherwise read and bounded like
+     * {@see self::integer()}. Anything else throws, listing the off words.
+     *
+     * @param  list<string>  $offWords
+     */
+    public static function optionalInteger(string $key, #[SensitiveParameter] ?int $default, ?int $min = null, ?int $max = null, array $offWords = ['off']): ?int
+    {
+        return ConfigValidator::forRepository()->optionalInteger($key, $default, $min, $max, $offWords);
+    }
+
+    /**
+     * A class-string implementing (or extending) `$contract`: `$default` when the
+     * key is not set; otherwise an existing, instantiable `$contract` that is not
+     * the contract itself, returned as declared. Anything else throws
+     * `notAnImplementation`.
+     *
+     * @template T of object
+     *
+     * @param  class-string<T>  $contract
+     * @param  class-string<T>|null  $default
+     * @return ($default is null ? class-string<T>|null : class-string<T>)
+     */
+    public static function implementation(string $key, string $contract, ?string $default = null): ?string
+    {
+        return ConfigValidator::forRepository()->implementation($key, $contract, $default);
+    }
+
+    /**
+     * A map of names to non-empty strings: `[]` when the key is not set; a
+     * non-map, a bad name or a bad value throws (a bad value naming the entry,
+     * `[key.name]`). Values are returned as given.
+     *
+     * @return array<string, string>
+     */
+    public static function stringMap(string $key): array
+    {
+        return ConfigValidator::forRepository()->stringMap($key);
+    }
+
+    /**
      * Validate the values inside an array you were handed (e.g. the payload a
      * DTO's `fromArray()` received), rather than reading the global repository
      * behind the caller's back. Optionally nominate the exception class thrown
