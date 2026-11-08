@@ -6,6 +6,8 @@ All notable changes to `package-toolkit-for-laravel` are documented in this file
 
 ## Unreleased
 
+## 2.1.0 - 2026-11-08
+
 ### Added
 
 - Five config readers on `Config` and `ConfigValidator`, with the same "not set means the
@@ -31,6 +33,11 @@ All notable changes to `package-toolkit-for-laravel` are documented in this file
   key in `primaryKeyTypeConfigKey()`.
 - `Concerns\StoresUtcTimestamps`: a model writes its timestamps and soft deletes in UTC,
   whatever `app.timezone` is.
+
+### Changed
+
+- Maintenance: the PHP 8.6 test jobs resolve Laravel 13.32 or later, the first 13.x release
+  that supports PHP 8.6.
 
 ## 2.0.0 - 2026-11-07
 
