@@ -25,6 +25,12 @@ All notable changes to `package-toolkit-for-laravel` are documented in this file
   messages as its own type. `InvalidConfigurationException` uses it and stays `final`, and its
   messages are unchanged. New factories for the new readers: `notAnIntegerList()`,
   `notAnIntegerItem()`, `itemOutOfRange()`, `notAnIntegerOrOff()` and `notAStringMap()`.
+- `Concerns\HasConfigurableKey`: a model's own primary key follows a
+  `<pkg>.primary_key_type` config key. It is an auto-increment `bigint`, a time-ordered `uuid7`
+  or a `ulid`, and a malformed route key is refused before it reaches SQL. The model names the
+  key in `primaryKeyTypeConfigKey()`.
+- `Concerns\StoresUtcTimestamps`: a model writes its timestamps and soft deletes in UTC,
+  whatever `app.timezone` is.
 
 ## 2.0.0 - 2026-11-07
 
